@@ -1,0 +1,4 @@
+interface:
+  display_name: "OCEAN Daily Close"
+  short_description: "Audit, record, and snapshot daily OCEAN public scores"
+  default_prompt: "Use $ocean-daily-close after 2026-08-20 to record all three OCEAN Public scores and push a private snapshot."

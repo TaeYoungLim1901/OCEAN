@@ -1,0 +1,273 @@
+{
+  "meta": {
+    "problem": "P2",
+    "title": "소청초 기지 중간층 수온 연직 구조 복원",
+    "metric": "통합 RMSE(degC), 26061행",
+    "updated": "2026-08-13",
+    "id_prefix": {
+      "r.": "rule",
+      "f.": "fact",
+      "p.": "physics",
+      "a.": "axis",
+      "s.": "asset",
+      "g.": "gate"
+    }
+  },
+  "nodes": [
+    {
+      "id": "r.mask",
+      "type": "rule",
+      "t": "2025-09-01~10-31 층 2·3·4의 temp와 psal은 함께 가림",
+      "src": "P2CONTEXT 2-2",
+      "hard": true
+    },
+    {
+      "id": "r.sub_format",
+      "type": "rule",
+      "t": "station,layer,time,temp 26061키, temp -5~45 유한",
+      "src": "P2_data/score.py",
+      "hard": true
+    },
+    {
+      "id": "r.no_redistribute",
+      "type": "rule",
+      "t": "KORS 원자료 재배포 금지",
+      "src": "P2_data/README",
+      "hard": true
+    },
+    {
+      "id": "r.permissive",
+      "type": "rule",
+      "t": "명시적으로 금지되지 않은 것은 허용하되 근거를 기록",
+      "src": "사용자 지시 2026-08-13",
+      "hard": false
+    },
+    {
+      "id": "r.target_depth_allowed",
+      "type": "rule",
+      "t": "가림 구간은 층 2·3·4의 수온과 염분만 제외한다고 명시되어 배포본에 남은 depth는 사용 가능. 다만 sensitivity를 함께 측정",
+      "src": "P2CONTEXT 2-2: 가림 층의 염분도 함께 제외; P2_data/README: temp와 psal을 함께 가림",
+      "hard": false
+    },
+    {
+      "id": "f.depth_shift",
+      "type": "fact",
+      "t": "2024와 2025의 센서 수심·층 수가 다름; 실제·공칭 depth 좌표 필요",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.layer5_gap",
+      "type": "fact",
+      "t": "2025 가림 구간 layer5 temp가 2629행 결측; 다른 공개 하층 앵커 필요",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "p.stratification",
+      "type": "physics",
+      "t": "9~10월 성층 약화로 수온약층 곡률과 혼합 상태가 변함",
+      "src": "P2CONTEXT 2-1, DOMAIN_RESEARCH"
+    },
+    {
+      "id": "p.internal_tide",
+      "type": "physics",
+      "t": "M2 12.4206h, S2 12h와 층간 위상차 가능",
+      "src": "P2CONTEXT 2-3, DOMAIN_RESEARCH"
+    },
+    {
+      "id": "a.residual_lgb",
+      "type": "axis",
+      "t": "깊이 선형보간 잔차를 다층·성층·시간 문맥으로 보정",
+      "status": "open",
+      "src": "E001"
+    },
+    {
+      "id": "a.profile_depth",
+      "type": "axis",
+      "t": "actual-depth 보간과 nominal-depth 보간 비교",
+      "status": "open",
+      "src": "E001"
+    },
+    {
+      "id": "a.tide_context",
+      "type": "axis",
+      "t": "M2/S2와 공개층 시계열 문맥은 동일 holdout 이득일 때만 채택",
+      "status": "open",
+      "src": "E001"
+    },
+    {
+      "id": "a.same_sensor_gap",
+      "type": "axis",
+      "t": "2025-07-02~08-31 연속 pseudo-gap에 test 공개층 결측 패턴을 이식한 same-sensor 검증",
+      "status": "open",
+      "src": "E002"
+    },
+    {
+      "id": "g.data",
+      "type": "gate",
+      "t": "원본 해시·스키마·가림 구조 검사",
+      "src": "src/check.py data"
+    },
+    {
+      "id": "g.pipeline",
+      "type": "gate",
+      "t": "생산 경로의 base_nom이 배포 baseline과 일치",
+      "src": "src/check.py pipeline"
+    },
+    {
+      "id": "g.cases",
+      "type": "gate",
+      "t": "2024 연속 2개월 동시 마스크와 공개층 수 검사",
+      "src": "src/check.py cases"
+    },
+    {
+      "id": "f.kdd_accuair",
+      "type": "fact",
+      "t": "KDD Cup 2018 AccuAir는 급변·관측소 시공간 상관을 gate로 다루고 LightGBM·Gated-DNN·Seq2Seq 앙상블로 2개 트랙 1위, 1개 2위",
+      "src": "https://www.kdd.org/kdd2019/accepted-papers/view/accuair-winning-solution-to-air-quality-prediction-for-kdd-cup-2018"
+    },
+    {
+      "id": "f.odc_independent",
+      "type": "fact",
+      "t": "Ocean Data Challenge SSH mapping은 부분 관측 복원을 독립 Cryosat-2로 검증하며 OI 0.85 대비 최고 공개 방법군 0.90",
+      "src": "https://github.com/ocean-data-challenges/2021a_SSH_mapping_OSE"
+    },
+    {
+      "id": "r.robust_transfer",
+      "type": "rule",
+      "t": "유사대회 전략은 고정 2개와 rolling 2개 pseudo-gap의 평균 개선 및 층·결측·성층 segment 비붕괴를 모두 통과할 때만 전이",
+      "src": "P2/COMPETITION_RESEARCH.md; P2/specs/E003-foundation.md"
+    },
+    {
+      "id": "a.profile_eof",
+      "type": "axis",
+      "t": "target 3층 수심보간 잔차를 2개 EOF/PCA 성분으로 공동 복원하고 성층 regime에서 붕괴 여부를 검증",
+      "src": "P2/COMPETITION_RESEARCH.md",
+      "status": "closed",
+      "evidence": "E003: 평균 -0.059417이나 2025 Jul-Aug missing-public +0.057425, layer3 +0.067921로 사전 차단"
+    },
+    {
+      "id": "a.lag_rolling",
+      "type": "axis",
+      "t": "공개층 6시간 lag/lead·rolling std를 E002 잔차 모델에 추가",
+      "src": "E003",
+      "status": "closed",
+      "evidence": "E003: 평균 -0.068386이나 2025 Jul-Aug missing-public +0.066278, layer4 +0.047327로 사전 차단"
+    },
+    {
+      "id": "a.regime_blend",
+      "type": "axis",
+      "t": "성층 3구간별 EOF/enhanced 선택과 cross-holdout 고정 가중 blend",
+      "src": "E003",
+      "status": "closed",
+      "evidence": "E003 robust blend 평균 -0.066248이나 2025 Jul-Aug missing-public +0.050881로 사전 차단; residual rho 0.939541"
+    },
+    {
+      "id": "a.missing_gate",
+      "type": "axis",
+      "t": "행 단위 missing_public 플래그로 E002와 E003 후보(eof/enhanced/robust_blend)를 하드 게이트 혼합",
+      "status": "closed",
+      "evidence": "E004: robust_blend 채택; 4-hold 평균 1.089067(Δ -0.072450), 2025 Jul-Aug 1.271631(Δ -0.029855), missing_public 최대 Δ 0.000000, n≥200 segment 최대 Δ +0.010719"
+    },
+    {
+      "id": "g.e004",
+      "type": "gate",
+      "t": "E004 missing_public 행 단위 게이트 및 제출 감사",
+      "src": "P2/src/gate_e004.py; P2/cache/E004/metrics.json; P2/src/submission_tools.py audit; P2/src/check.py sub",
+      "status": "passed",
+      "selected": "robust_blend"
+    },
+    {
+      "id": "a.mask_augment",
+      "type": "axis",
+      "t": "학습 입력에 test 연속 결측 패턴을 주입해 공개층 결측 regime 전용 경로를 학습",
+      "status": "closed",
+      "evidence": "E005: 4-hold 균등규칙 기각. maskaug 평균 +0.004738, missing_public 2/4만 개선(2024_sepoct -0.134542, 2025_julaug -0.075698 / 2024_julaug +0.066920, 2025_mayjun +0.057907). 계절 정합 재판정(a.season_matched_holdout)은 미완"
+    },
+    {
+      "id": "a.season_matched_holdout",
+      "type": "axis",
+      "t": "test 와 같은 Sep-Oct 계절 창으로만 결측 regime 모델을 판정",
+      "status": "closed",
+      "evidence": "E006: 계절 정합 창 4개에서 maskaug 결측행 3/4 개선(S1 -0.187817, S3 -0.126989, S4 -0.059486) 평균 -0.052651이나 S2(2024-08-16~10-15) missing +0.163685·전체 +0.045741로 R3·R4 위반 기각. 8월 비중 큰 창에서만 진다"
+    },
+    {
+      "id": "g.e006",
+      "type": "gate",
+      "t": "E006 계절 정합 holdout maskaug 게이트",
+      "src": "P2/src/season_e006.py; P2/cache/E006/metrics.json",
+      "status": "rejected",
+      "selected": "E004"
+    },
+    {
+      "id": "a.layer4_anchor",
+      "type": "axis",
+      "t": "layer_5 결측 시 더 깊은 공개층을 하부 앵커로 써 layer_4 외삽 퇴화를 고친다",
+      "status": "closed",
+      "evidence": "E007 표0: layer_4 행의 base_nom 하부앵커 없음 비율 0.000000 (전 hold·test), common.py:58-64 가 이미 PUBLIC_LAYERS 6·7 사용. layer5 temp 결측률은 test 0.290991 이나 앵커 자체는 항상 존재. 외삽 퇴화 가설 기각, 학습 미실행"
+    },
+    {
+      "id": "a.loho_stack",
+      "type": "axis",
+      "t": "저장된 OOF 풀 전체에 비음수 합1 가중을 LOHO 로 추정",
+      "status": "closed",
+      "evidence": "E008: LOHO 판정에서 stack_global 1.110727(+0.021660), stack_regime 1.093994(+0.004927) 모두 E004 1.089067 대비 악화. hold 간 가중이 전이되지 않음(adversarial AUC 0.99 와 정합). 재학습 없이 풀 재조합만으로는 이득 없음"
+    }
+  ],
+  "edges": [
+    [
+      "f.depth_shift",
+      "requires",
+      "a.profile_depth"
+    ],
+    [
+      "f.layer5_gap",
+      "requires",
+      "a.residual_lgb"
+    ],
+    [
+      "a.tide_context",
+      "derives_from",
+      "p.internal_tide"
+    ],
+    [
+      "r.mask",
+      "requires",
+      "g.cases"
+    ],
+    [
+      "a.profile_depth",
+      "derives_from",
+      "r.target_depth_allowed"
+    ],
+    [
+      "f.kdd_accuair",
+      "requires",
+      "a.residual_lgb"
+    ],
+    [
+      "f.odc_independent",
+      "requires",
+      "a.same_sensor_gap"
+    ],
+    [
+      "a.profile_eof",
+      "derives_from",
+      "f.odc_independent"
+    ],
+    [
+      "r.robust_transfer",
+      "requires",
+      "a.profile_eof"
+    ],
+    [
+      "g.e004",
+      "measures",
+      "a.missing_gate"
+    ],
+    [
+      "g.e006",
+      "measures",
+      "a.season_matched_holdout"
+    ]
+  ]
+}

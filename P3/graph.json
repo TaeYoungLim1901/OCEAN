@@ -1,0 +1,739 @@
+{
+  "meta": {
+    "problem": "P3",
+    "title": "종합해양과학기지 유의파고 단기 예측",
+    "metric": "통합 RMSE(m), 1200건",
+    "updated": "2026-08-13",
+    "id_prefix": {
+      "r.": "rule",
+      "f.": "fact",
+      "p.": "physics",
+      "a.": "axis",
+      "s.": "asset",
+      "g.": "gate"
+    }
+  },
+  "nodes": [
+    {
+      "id": "r.context_only",
+      "type": "rule",
+      "t": "추론은 해당 case_id 의 48h 컨텍스트만 사용. 다른 case 의 행을 섞지 않는다",
+      "src": "P3CONTEXT 3-2, 3-4",
+      "hard": true
+    },
+    {
+      "id": "r.no_abs_time",
+      "type": "rule",
+      "t": "case_id↔절대 기준시각 대응표는 운영자 전용. 배포본에 단서 없음",
+      "src": "P3CONTEXT 3-4",
+      "hard": true
+    },
+    {
+      "id": "r.model_submit",
+      "type": "rule",
+      "t": "2026-09-07 까지 코드+가중치 제출. 업로드한 예측을 재현하지 못하면 성적 무효. 제출 즉시 답안 업로드 종료",
+      "src": "제출안내 2,3",
+      "hard": true
+    },
+    {
+      "id": "r.sub_daily",
+      "type": "rule",
+      "t": "답안 업로드 팀당 하루 1회. 8/20 개시",
+      "src": "제출안내 1",
+      "hard": true
+    },
+    {
+      "id": "r.sub_format",
+      "type": "rule",
+      "t": "열 순서 case_id,station,lead_h,hs_pred 고정. hs_pred 는 0~30m 유한. 키 1200건 정확일치",
+      "src": "score.py",
+      "hard": true
+    },
+    {
+      "id": "r.no_redistribute",
+      "type": "rule",
+      "t": "KORS 관측자료 재배포 금지. 원본을 공개 저장소에 올리지 않는다",
+      "src": "P3_data/README",
+      "hard": true
+    },
+    {
+      "id": "r.permissive",
+      "type": "rule",
+      "t": "명시적으로 금지되지 않은 것은 허용으로 해석한다. 단 근거를 rule 노드로 남긴다",
+      "src": "사용자 지시 2026-08-13",
+      "hard": false
+    },
+    {
+      "id": "f.atmos_gap_is",
+      "type": "fact",
+      "t": "train_atmos 의 I-ORS·S-ORS 는 2025-01-01 부터만 존재(각 26,064행). G-ORS 만 2024-01-01 부터 78,768행",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.no_time_col",
+      "type": "fact",
+      "t": "test_context.parquet 13열에 시각 열이 없다. step_minute 상대시간뿐",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.grid_complete",
+      "type": "fact",
+      "t": "파랑 20분·기상 10분 격자에 시간 갭 0건. 결측은 값 결측뿐(train hs 8.7%, test 기상 3%)",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.case_counts",
+      "type": "fact",
+      "t": "test 200 case = G-ORS 70 / I-ORS 70 / S-ORS 60. case 당 289행, step_minute=0 행 정확히 200개",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.case_selection",
+      "type": "fact",
+      "t": "사례 조건: 기준시각 hs>=1.5m, 6개 리드 정답 모두 유효, 동일 정점 t0 간격 >=78h",
+      "src": "P3CONTEXT 3-2"
+    },
+    {
+      "id": "f.persistence",
+      "type": "fact",
+      "t": "지속성 RMSE 전체 0.769455 / +3h 0.5460 +6h 0.7011 +9h 0.7061 +12h 0.7596 +18h 0.8897 +24h 0.9464",
+      "src": "P3_data/README"
+    },
+    {
+      "id": "f.policy_T",
+      "type": "fact",
+      "t": "T=0.624165 는 숨은 모델 점수가 아니라 공개된 정책 상수. B=0점, T=70점, RMSE 0=100점, T 초과도 계속 증가",
+      "src": "P3_data/README"
+    },
+    {
+      "id": "f.public_split",
+      "type": "fact",
+      "t": "Public 66사례(396건) B=0.750046 / Private 134사례(804건) B=0.778838. Public 은 참고용",
+      "src": "P3_data/README"
+    },
+    {
+      "id": "f.hs_dist",
+      "type": "fact",
+      "t": "train hs 중앙값 G 0.97 / I 0.84 / S 0.73 m. hs>=1.5 비율 G 26% / I 19% / S 18%",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.env",
+      "type": "fact",
+      "t": "python 3.14.6, numpy 2.4.6, pandas 3.0.5, pyarrow 25.0.0, lightgbm 4.7.0, sklearn 1.9.0, scipy 1.18.0. xgboost·catboost·torch 미설치",
+      "src": "환경 조회 2026-08-13"
+    },
+    {
+      "id": "f.pipeline_check",
+      "type": "fact",
+      "t": "baseline_persistence.csv 는 각 case 의 step_minute=0 hs 를 6리드에 그대로 복사한 값. 정답 없이 생산경로를 완전일치로 검증할 수 있다",
+      "src": "P3_data/README"
+    },
+    {
+      "id": "f.cv_is_explorer",
+      "type": "fact",
+      "t": "train 2024-01~2025-06 / test 2025-07~2026-06. 학습에 7~12월이 1번뿐이고 test 는 미래 연도다. 로컬 홀드아웃은 판정기가 아니라 탐색기다",
+      "src": "설계 2026-08-13"
+    },
+    {
+      "id": "p.rmse_optimum",
+      "type": "physics",
+      "t": "RMSE 의 최적 예측은 조건부 평균. 중앙값·분위수 목적함수는 목표가 아니다. 분위수를 쓰면 평균으로 되돌려야 한다"
+    },
+    {
+      "id": "p.selection_regression",
+      "type": "physics",
+      "t": "t0 hs>=1.5 조건부 표본은 분포 상위꼬리다. 평균회귀는 아래 방향이며 리드가 길수록 커진다. 지속성은 계통적으로 과대예측일 가능성이 높다"
+    },
+    {
+      "id": "p.lead_shrink",
+      "type": "physics",
+      "t": "리드 증가 → 조건부 분산 증가 → 최적 점추정은 기후평균 쪽으로 수축한다. 최적 수축계수는 리드별로 다르다"
+    },
+    {
+      "id": "p.windsea_swell",
+      "type": "physics",
+      "t": "hs 는 풍파(국지 강제, 수시간 반응)와 너울(원격 생성, 완만 감쇠)의 합. tp 가 크고 wspd 가 낮으면 너울 지배"
+    },
+    {
+      "id": "p.decay",
+      "type": "physics",
+      "t": "폭풍 정점 이후 hs 는 준지수적으로 감쇠한다. e-folding 시간 규모는 대략 12~24h"
+    },
+    {
+      "id": "p.pm_equilibrium",
+      "type": "physics",
+      "t": "완전발달 해상 Pierson-Moskowitz: Hs_eq ≈ 0.0246·U10². 현재 hs 와 Hs_eq 의 차이가 성장/감쇠 방향을 준다"
+    },
+    {
+      "id": "p.steepness",
+      "type": "physics",
+      "t": "파형경사 hs/(1.56·tp²) 는 물리 상한(대략 0.06)이 있다. 이상치·센서 오류 탐지 및 예측 상한 클리핑에 쓴다"
+    },
+    {
+      "id": "p.hmax_ratio",
+      "type": "physics",
+      "t": "레일리 분포에서 hmax/hs 는 대략 1.6~2.0. 벗어나면 관측 품질 문제 신호"
+    },
+    {
+      "id": "p.pressure_tendency",
+      "type": "physics",
+      "t": "48h 기압 변화율의 부호·크기가 저기압 접근/이탈을 나타낸다. 절대시각 없이 쓸 수 있는 유일한 종관 정보"
+    },
+    {
+      "id": "p.season_proxy",
+      "type": "physics",
+      "t": "절대시각이 없으므로 계절은 airt·caph·relh 수준으로만 역추정한다. 겨울 계절풍 파랑과 여름 태풍성 파랑은 감쇠 특성이 다르다"
+    },
+    {
+      "id": "p.swell_blind",
+      "type": "physics",
+      "t": "원격 해역에서 도착하는 너울은 48h 지점 관측에 선행 신호가 없다. +18/+24h 오차 하한의 물리적 원인. 제거 불가"
+    },
+    {
+      "id": "p.station_geo",
+      "type": "physics",
+      "t": "G-ORS 가거초 · I-ORS 이어도 · S-ORS 소청초 (KIOST 종합해양과학기지). 수심·취송거리·태풍 노출이 다르다. 미검증 — 쓰기 전 확인",
+      "verified": false
+    },
+    {
+      "id": "a.damped_persistence",
+      "type": "axis",
+      "status": "open",
+      "t": "hs(t0+τ) = c(τ)·hs(t0) + (1-c(τ))·μ(station). 학습 0회, 파라미터 소수. 진짜 기준선"
+    },
+    {
+      "id": "a.lead_shrinkage",
+      "type": "axis",
+      "status": "open",
+      "t": "리드별 수축계수를 사례 표본에서 직접 적합. p.selection_regression 검정과 동시에 얻는다"
+    },
+    {
+      "id": "a.gbdt_direct",
+      "type": "axis",
+      "status": "open",
+      "t": "LightGBM 리드별 직접예측. 컨텍스트 요약 피처. L2 목적함수"
+    },
+    {
+      "id": "a.windsea_swell_split",
+      "type": "axis",
+      "status": "open",
+      "t": "tp·wspd 로 풍파/너울 성분을 분리해 각각 다른 감쇠식을 적용"
+    },
+    {
+      "id": "a.equilibrium_relax",
+      "type": "axis",
+      "status": "closed",
+      "t": "hs 를 Hs_eq(U) 로 완화시키는 1차 미분방정식 피팅. p.pm_equilibrium 기반",
+      "evidence": "eqrelax 9파라미터 뷰A 단독 1.0203 (지속성 0.8620, damped 0.8082 보다 나쁨). 적합 a=0.0033 vs PM 0.0246, b~1.0 으로 상수 붕괴. 216건 중 79건 wspd 전결측. T1F 혼합 최적가중 0.05 로 뷰A 0.760088, 개선 -0.001038 < 임계 0.003"
+    },
+    {
+      "id": "a.pooled_station",
+      "type": "axis",
+      "status": "open",
+      "t": "3정점 통합 학습 + station 지시자. I/S 의 2024 기상 결측(f.atmos_gap_is)을 우회한다"
+    },
+    {
+      "id": "a.transductive_stats",
+      "type": "axis",
+      "status": "closed",
+      "t": "test_context 200개 컨텍스트를 정규화·분포보정에 사용. 라벨은 안 쓰지만 다른 case 의 행이 예측에 들어간다",
+      "evidence": "r.context_only: 추론 피처·정규화·예측은 해당 case_id의 289행만 사용; test 200사례 전체 통계는 다른 case 결합이므로 금지"
+    },
+    {
+      "id": "a.multi_lead_joint",
+      "type": "axis",
+      "status": "open",
+      "t": "6리드를 동시 출력하고 단조·평활 제약을 건다. 리드 간 오차 상관을 이용"
+    },
+    {
+      "id": "a.log_target",
+      "type": "axis",
+      "status": "open",
+      "t": "log(hs) 학습 후 역변환. 단 RMSE 는 원공간이므로 역변환 편향 보정 필요(p.rmse_optimum)"
+    },
+    {
+      "id": "a.seq_model",
+      "type": "axis",
+      "status": "open",
+      "t": "1D CNN·GRU 로 289스텝 원시 컨텍스트를 직접 학습. torch 미설치(f.env) — 사용자 승인 필요"
+    },
+    {
+      "id": "a.external_pretrain",
+      "type": "axis",
+      "status": "open",
+      "t": "외부 파랑 관측으로 사전학습. 추론은 컨텍스트만 쓰므로 r.context_only 와 충돌하지 않는다. 규정 미확인 상태 — 보류"
+    },
+    {
+      "id": "a.calendar_features",
+      "type": "axis",
+      "status": "closed",
+      "t": "월·시각 등 달력 피처",
+      "evidence": "f.no_time_col — test 에 절대시각 단서가 없어 계산 자체가 불가"
+    },
+    {
+      "id": "a.abs_time_align",
+      "type": "axis",
+      "status": "closed",
+      "t": "case 를 절대시각에 대응시켜 외부 기상장을 붙이기",
+      "evidence": "r.no_abs_time + f.case_selection 의 78h 간격 설계. 배포본에 단서 없음"
+    },
+    {
+      "id": "g.data",
+      "type": "gate",
+      "t": "python P3/src/check.py data — 격자·중복·역행·정점 커버리지. 최초 1회 + 전처리 변경 시"
+    },
+    {
+      "id": "g.pipeline",
+      "type": "gate",
+      "t": "python P3/src/check.py pipeline — persistence 재현이 baseline_persistence.csv 와 완전일치. 하네스 변경 시마다"
+    },
+    {
+      "id": "g.cv",
+      "type": "gate",
+      "t": "python P3/src/check.py cv — case 그룹 누출, 달력 피처 혼입, t0 이후 정보, 사례선택 조건 일치. 학습 전"
+    },
+    {
+      "id": "g.spec",
+      "type": "gate",
+      "t": "python scripts/preflight.py spec <파일> — codex 호출 전"
+    },
+    {
+      "id": "g.sub",
+      "type": "gate",
+      "t": "python scripts/preflight.py sub <csv> --index P3/P3_data/test_index.csv — 제출 전"
+    },
+    {
+      "id": "f.selection_replicated",
+      "type": "fact",
+      "t": "78h 그리디 시닝으로 로컬 평가셋을 만들면 t0 hs 분위(1.52/1.55/1.66/1.99)가 공식(1.52/1.55/1.64/1.86)과 일치. 공식 사례 선정 프로토콜을 복제했다",
+      "src": "check.py cases 2026-08-13"
+    },
+    {
+      "id": "f.local_baseline",
+      "type": "fact",
+      "t": "로컬 78h 평가셋 272건 지속성 통합 RMSE 0.832899. 리드별 0.5764/0.7525/0.8286/0.8638/0.9526/0.9610. 공식 0.769455 와 절대 비교 금지, 델타만",
+      "src": "cases.py 2026-08-13"
+    },
+    {
+      "id": "f.persistence_bias",
+      "type": "fact",
+      "t": "지속성 평균편차 리드별 -0.008/-0.057/-0.066/-0.057/-0.231/-0.355. 편향만 제거해도 +24h 는 0.961->0.893",
+      "src": "cases.py 2026-08-13"
+    },
+    {
+      "id": "f.pipeline_verified",
+      "type": "fact",
+      "t": "check.py pipeline 통과: 추론 경로 지속성 예측이 baseline_persistence.csv 와 1200건 전부 최대 절대차 0.0",
+      "src": "2026-08-13"
+    },
+    {
+      "id": "f.t1_oof",
+      "type": "fact",
+      "t": "p3_t1 purged 5-fold OOF: persistence 0.832899, damped 0.787552, direct-delta LightGBM 0.766139, 0.4/0.6 blend 0.750046; 잔차상관 0.872939",
+      "src": "P3/cache/p3_t1/report.json 2026-08-13"
+    },
+    {
+      "id": "s.t1_submission",
+      "type": "asset",
+      "t": "첫 제출 후보 P3/subs/submission_p3_t1.csv; SHA256 88B770B5802D27ED9756F40F1936868C671185042CBB2FCD12F683353A253854; inference 재실행 완전일치",
+      "src": "P3/src/inference.py 2026-08-13"
+    },
+    {
+      "id": "f.t1f_outer",
+      "type": "fact",
+      "t": "folds0-3이 선택한 LightGBM weight=0.65; sealed fold4 RMSE blend 0.754739가 persistence 0.783322, damped 0.770684, LGBM 0.784077 모두 개선; all OOF 0.750246",
+      "src": "P3/cache/p3_t1/t1f_report.json 2026-08-13"
+    },
+    {
+      "id": "s.t1f_submission",
+      "type": "asset",
+      "t": "P3/subs/submission_p3_t1f.csv; SHA256 2E4984283B047950E5D2DA219EF6D8B3D02D7FEB54CC67DAA2AF75764D3470C1; model component max delta 0, 재실행 hash 일치",
+      "src": "P3/src/inference_t1f.py 2026-08-13"
+    },
+    {
+      "id": "f.gefcom2014_gbm",
+      "type": "fact",
+      "t": "GEFCom2014 Wind 1위 kPower(56.6%)는 10개 정점 24h 예측에 2-layer GBM과 target/neighbor lead의 풍속·방향, CV를 사용했다",
+      "src": "Hong et al. 2016 Table 3/Table 9; https://robjhyndman.com/papers/gefcom2014.pdf"
+    },
+    {
+      "id": "f.m5_grouped_lgbm",
+      "type": "fact",
+      "t": "M5 1위(WRMSSE 0.520)는 grouped series에 6개 LightGBM 평균과 최근 4개 미래창 CV의 평균·변동성을, 4위(0.536)는 store별 forecast-week별 direct LightGBM을 사용했다",
+      "src": "Makridakis et al. M5 Accuracy results Table 3/Section 4.2; https://statmodeling.stat.columbia.edu/wp-content/uploads/2021/10/M5_accuracy_competition.pdf"
+    },
+    {
+      "id": "a.strict_forward_nested",
+      "type": "axis",
+      "t": "정점별 시간순 folds1-3 selection 후 최신 fold4를 완전 봉인하며 train은 validation 시작 78h 이전만 허용",
+      "src": "P3/specs/T3-foundation-t2.md",
+      "status": "closed",
+      "evidence": "strict-forward 4폴드 구조는 T2/T8 에서 구현·검증 완료(전 폴드 strict=true). 단 씨닝 봉인 53건은 판정 불가 해상도 — f.thinned_judge_inverts"
+    },
+    {
+      "id": "a.station_lead_experts",
+      "type": "axis",
+      "t": "pooled, lead-specific, station expert direct-delta GBDT를 clean OOF 잔차와 segment tail로 비교",
+      "src": "P3/COMPETITION_RESEARCH.md; f.gefcom2014_gbm; f.m5_grouped_lgbm",
+      "status": "closed",
+      "evidence": "pooled 216건 T2 0.783739 vs T1F 0.761126 (+0.022614). 후보별 fold평균 lgbm_pooled 0.857719 / lgbm_lead 0.841874 / lgbm_station 0.883483 전부 damped 0.819948 이하. 401피처 확장이 T1 40피처 LGBM(0.766139) 대비 악화"
+    },
+    {
+      "id": "f.p3_forward_foundation",
+      "type": "fact",
+      "t": "strict-forward folds1-4의 train/val은 2090/55, 3145/55, 4786/53, 6828/53이며 모든 정점에서 max train t0 < val start-78h를 만족한다",
+      "src": "P3/cache/p3_t2/foundation_report.json 2026-08-13"
+    },
+    {
+      "id": "f.p3_shift_risk",
+      "type": "fact",
+      "t": "case-local 401피처 adversarial validation AUC=0.9293; 최대 drift는 hmax 1/3/6h missingness(z=3.95/4.05/3.48)로 train-test 기간 shift가 크다. 진단 전용이며 예측에는 test 통계를 쓰지 않았다",
+      "src": "P3/cache/p3_t2/foundation_report.json 2026-08-13"
+    },
+    {
+      "id": "f.p3_t2_runtime_stop",
+      "type": "fact",
+      "t": "p3_t2는 401피처 cache와 fold 생성 뒤 모델 묶음이 runtime 상한을 초과해 OOF/model 생성 전에 중지; 성능 미평가이므로 축은 닫지 않고 T1F를 유지했다",
+      "src": "P3/experiments/log.md p3_t2_runtime_stop 2026-08-13"
+    },
+    {
+      "id": "f.fold4_tail_empty",
+      "type": "fact",
+      "t": "봉인 fold4(53건)에 hs0>3m 0건, 2.25-3m 1건. 272건 평가셋 전체도 bin2=28 bin3=14. fold4 단독 세그먼트 cap 은 tail 에서 측정 불가",
+      "src": "P3/cache/p3_t2/folds.csv 교차표 2026-08-13"
+    },
+    {
+      "id": "f.t2_outer_gain",
+      "type": "fact",
+      "t": "T2 blend(damped 0.5 + ExtraTrees 0.5) fold4 봉인 0.738364 vs T1F 0.754739, 델타 -0.016376. hs0bin:2(n=1) 악화 +0.0721 로 사전등록 cap 0.03 위반해 accepted=false",
+      "src": "P3/cache/p3_t2/report.json"
+    },
+    {
+      "id": "f.t5_rejudge",
+      "type": "fact",
+      "t": "T5 뷰A folds1-4 pooled 216건에서 고정 damped 0.5 + extra 0.5는 RMSE 0.783739, T1F 0.761126, 델타 +0.022614; n>=20 최대 악화 +0.072263; 뷰B fold4 53건 델타 -0.016376로 실험1 불합격",
+      "src": "P3/cache/p3_t5/report.json"
+    },
+    {
+      "id": "f.t5_lgbm_leak",
+      "type": "fact",
+      "t": "T1 train.py fold4 학습 마스크는 abs(hours) 대칭식이며 strict t0 < fold_start-78h가 아니다; train rows 6830 vs strict 6828, 차이 2행",
+      "src": "P3/src/train.py, P3/cache/p3_t5/report.json"
+    },
+    {
+      "id": "f.t1_symmetric_mask_leak",
+      "type": "fact",
+      "t": "train.py 의 대칭 abs(hours) 마스크로 T1 계열 OOF 학습행에 미래 2행 혼입 (fold4 6830 vs strict-forward 6828). T1F 봉인수치 0.754739 는 엄밀 strict-forward 가 아니다",
+      "src": "P3/cache/p3_t5/report.json leak_check"
+    },
+    {
+      "id": "f.t2_pooled_loss",
+      "type": "fact",
+      "t": "T2 blend 는 folds1-4 pooled 216건에서 0.783739 로 T1F 0.761126 보다 +0.022614 악화. hs0bin:2 는 pooled n=23 에서도 +0.072263 악화로 fold4 n=1 노이즈가 아니다. 401피처 direct-delta GBDT 5후보 전부 damped 에 패배",
+      "src": "P3/cache/p3_t5/report.json"
+    },
+    {
+      "id": "f.wspd_missing_37pct",
+      "type": "fact",
+      "t": "평가 216사례 중 79건(37%)이 최근 6h wspd 전결측. 바람 구동 물리모델은 사례 3분의 1에서 신호가 없다. test 200건은 1건만 결측",
+      "src": "P3/cache/p3_t6/report.json wspd_all_missing_fallback_cases"
+    },
+    {
+      "id": "f.t1f_bin0_flat",
+      "type": "fact",
+      "t": "T1F 는 hs0<=1.75m(n=132, 제곱오차 기여 57%)에서 지속성 대비 -0.0132 밖에 못 번다. hs0bin2/3 은 -0.32/-0.59. I-ORS(n=62)는 T1F 0.7946 > damped 단독 0.7834 로 전역 blend 가중 w=0.65 가 해롭다",
+      "src": "P3/cache/p3_t6/report.json work0"
+    },
+    {
+      "id": "a.gated_blend",
+      "type": "axis",
+      "t": "station·hs0 컨텍스트 그룹별 저장 예측 simplex 혼합 가중",
+      "src": "P3/specs/T7-gated-blend.md",
+      "status": "closed",
+      "evidence": "T7 저장 예측 재가중: V1 뷰A 0.7603856 (T1F 대비 -0.0007399, 대조군 통과). V2/V3/V4 뷰A 0.7524790/0.7589011/0.7489152이나 fold4 0.7711949/0.7672159/0.7722676로 T1F 0.754739 기준 미달; accepted=false."
+    },
+    {
+      "id": "f.gated_weight_overfit",
+      "type": "fact",
+      "t": "게이트 혼합 가중은 그룹 수에 비례해 선택셋 개선·봉인 악화. 뷰A/fold4 = V1 0.760386/-, V3 0.758901/0.767216, V2 0.752479/0.771195, V4 0.748915/0.772268 (T1F 0.761126/0.754739). folds1-3 163사례로는 전역 스칼라 하나 이상을 못 고른다",
+      "src": "P3/cache/p3_t7/report.json"
+    },
+    {
+      "id": "f.t8_dense_fold1",
+      "type": "fact",
+      "t": "T8 fold1 조밀 OOF: 검증 988건(씨닝 55건 대비 17.964배), 학습 2090행. persistence/damped/lgbm_t1 RMSE 0.866184/0.702477/0.810882. 최초 계산 44.4s, 재개 0.1s, checkpoint 대비 np.allclose(atol=0)=True. fold2-4 미실행.",
+      "src": "P3/cache/p3_t8/ckpt/fold1.npz; P3/preds/oof_*_p3_t8.npy; 2026-08-13"
+    },
+    {
+      "id": "f.thinned_judge_inverts",
+      "type": "fact",
+      "t": "fold4 씨닝(53건)과 조밀(1163건) 판정이 역전. persistence/damped/lgbm_t1 씨닝 0.783322/0.770747/0.775590 vs 조밀 0.900254/0.724137/0.664543. 씨닝은 damped 우위 0.0048, 조밀은 lgbm 우위 0.0596 (5블록 중 4블록 일관). 조밀 재가중 0.769115/0.663402/0.614009. 순위 역전 쌍 damped/lgbm_t1, lgbm_t1/T1F. 실제 T1F 가중은 lgbm 편중 (f.t1f_weights)",
+      "src": "P3/cache/p3_t8/report.json task2"
+    },
+    {
+      "id": "f.dense_judge_bias",
+      "type": "fact",
+      "t": "조밀 판정기는 분산이 낮지만 편향이 있다. 씨닝 평가셋만 공식 t0 hs 분위수와 일치(P3/AGENTS.md). 조밀 fold4 는 hs0>3m 을 포함하고 씨닝 fold4 는 0건. 조밀을 쓰려면 hs0 분포 재가중이 필요하다",
+      "src": "P3/cache/p3_t8/report.json fold_counts, P3/AGENTS.md"
+    },
+    {
+      "id": "f.t9_weighted_dense",
+      "type": "fact",
+      "t": "T9 층별 분포 재가중: quartile edges 1.55/1.66/1.9925, weight 0.400929~4.588492, ESS fold1-4 571.932/948.603/1124.684/649.308. W_new 0.10/0.60/0.30; fold4 재가중 0.636824 vs T1F_dense 0.611959 (delta +0.024864), max n>=100 segment +0.045666, accepted=false.",
+      "src": "P3/cache/p3_t9/report.json; P3/specs/T9-weighted-dense-judge.md"
+    },
+    {
+      "id": "f.t1f_weights",
+      "type": "fact",
+      "t": "T1F 실제 가중 = persistence 0.00 / damped 0.35 / lgbm_t1 0.65. lgbm 편중이며 fold4 에서 씨닝·조밀비가중·조밀재가중 3판정기 모두 1위 (0.750315 / 0.665931 / 0.611959)",
+      "src": "P3/cache/p3_t9/report.json task1"
+    },
+    {
+      "id": "f.weight_time_unstable",
+      "type": "fact",
+      "t": "최적 혼합 가중이 시간에 불안정. 재가중 조밀 folds1-3 선택은 (0.10,0.60,0.30) damped 편중이나 fold4 에서 0.636824 로 T1F (0,0.35,0.65) 의 0.611959 보다 +0.024864 악화. 판정기를 고쳐도 재선택은 정당화되지 않는다",
+      "src": "P3/cache/p3_t9/report.json experiment4"
+    },
+    {
+      "id": "f.t1f_t12",
+      "type": "fact",
+      "t": "T12 fixed weight_lgbm=0.65; grid diagnostic=0.35; test_final npy SHA256=DEFCA2414E39183DB46B9FC004B65576F9467397019B9A3077F58755F47CD257; submission SHA256=2E4984283B047950E5D2DA219EF6D8B3D02D7FEB54CC67DAA2AF75764D3470C1; max_abs_delta=0; mean_abs_delta=0; audit/context_static/preflight/check data/check pipeline/g selftest=OK",
+      "src": "P3/specs/T12-pin-weight.md 2026-08-13"
+    },
+    {
+      "id": "f.t1f_honest_scores",
+      "type": "fact",
+      "t": "T1F 누수 제거 후 정직한 점수: 씨닝 뷰A(216) 0.801413, 씨닝 fold4 0.750315, 조밀 재가중 fold4 0.611959. 이전 기록 0.750246/0.761126 은 fold0 대칭마스크 누수로 부풀려진 값이다",
+      "src": "P3/cache/p3_t11/report.json, P3/cache/report.json"
+    },
+    {
+      "id": "f.recency_favors_wold",
+      "type": "fact",
+      "t": "T11 Δ(W_new−W_old) 는 fold1 -0.051305 / fold2 -0.013585 / fold3 +0.009943 / fold4 +0.015275. 후반 폴드일수록 W_old 우세이며 test 는 fold4 이후다. 최근성 가중 판정기는 W_old 를 강화할 뿐 새 정보가 없다",
+      "src": "P3/cache/p3_t11/report.json"
+    },
+    {
+      "id": "a.submission_budget",
+      "type": "asset",
+      "t": "8/20~9/6 답안 18회 예산. 1기(8/20-22) 판정기 교정: T1F 앵커/lgbm 단독/damped 단독. LB(lgbm)<LB(damped) 면 조밀 재가중 판정기 채택, 반대면 씨닝. 2기(8/23-31) 하루 1가설. 3기(9/1-6) 재조합, 9/5부터 새 가설 금지. LB 델타 0.003 미만은 노이즈 기각",
+      "src": "P3/SUBMISSION_PLAN.md"
+    },
+    {
+      "id": "f.hp_below_noise_floor",
+      "type": "fact",
+      "t": "T13: LGBM 6후보의 조밀 재가중 folds1-3 평균 순위와 봉인 fold4 순위가 Spearman -0.83 으로 역상관. fold4 범위 0.612~0.628, fold2/3 범위 0.004~0.006 이라 fold1 분산이 선택을 지배한다. 하이퍼파라미터 차이는 판정기 잡음 바닥 아래이며 folds1-3 선택은 fold4 를 예측하지 못한다",
+      "src": "P3/cache/p3_t13/report.json"
+    },
+    {
+      "id": "f.pool_no_diversity",
+      "type": "fact",
+      "t": "T15: 조밀 풀은 사실상 3멤버. lgbm_t1 대비 folds1-3 잔차 상관 persistence 0.746 / damped 0.842 / T13 변형 6개 0.989~0.996. 상관<0.90 은 damped·persistence 뿐이고 그 3개가 이미 T1F 구성이다. 동일가중 블렌드 봉인 fold4 0.653256 = T1F +0.041297 악화. 풀 최다양 자산은 씨닝 뷰 eqrelax ρ=0.645 이나 축은 닫혀 있다",
+      "src": "P3/cache/p3_t15/report.json"
+    },
+    {
+      "id": "f.dense_cv_gate_na",
+      "type": "fact",
+      "t": "check.py cv 는 조밀 fold 인덱스에 적용 대상이 아니다. 1h stride 라 모든 fold 경계에서 인접쌍 간격이 78h 미만인 게 구조적 필연이며 FAIL 이 뜬다. 실제 분리는 forward_train_mask 가 정점별 t0 < 검증시작-78h 로 학습 쪽에서 강제한다. 78h > 컨텍스트 48h + 최대리드 24h = 72h, 여유 6h",
+      "src": "P3/src/train_dense.py:175, P3/src/train_t2.py:47-53"
+    },
+    {
+      "id": "a.start_prompt",
+      "type": "asset",
+      "t": "다음 P3 세션 시작 프롬프트와 1기 제출 일정·해시·함정 3개. 세션 첫 입력으로 붙여넣는다",
+      "src": "P3/START.md"
+    }
+  ],
+  "edges": [
+    [
+      "r.no_abs_time",
+      "forbids",
+      "a.calendar_features"
+    ],
+    [
+      "r.no_abs_time",
+      "forbids",
+      "a.abs_time_align"
+    ],
+    [
+      "f.no_time_col",
+      "closes",
+      "a.calendar_features"
+    ],
+    [
+      "f.case_selection",
+      "closes",
+      "a.abs_time_align"
+    ],
+    [
+      "r.context_only",
+      "requires",
+      "g.cv"
+    ],
+    [
+      "r.sub_format",
+      "requires",
+      "g.sub"
+    ],
+    [
+      "r.model_submit",
+      "requires",
+      "g.pipeline"
+    ],
+    [
+      "f.pipeline_check",
+      "measures",
+      "g.pipeline"
+    ],
+    [
+      "f.atmos_gap_is",
+      "requires",
+      "a.pooled_station"
+    ],
+    [
+      "p.selection_regression",
+      "derives_from",
+      "f.case_selection"
+    ],
+    [
+      "p.lead_shrink",
+      "derives_from",
+      "f.persistence"
+    ],
+    [
+      "a.damped_persistence",
+      "derives_from",
+      "p.lead_shrink"
+    ],
+    [
+      "a.lead_shrinkage",
+      "derives_from",
+      "p.selection_regression"
+    ],
+    [
+      "a.equilibrium_relax",
+      "derives_from",
+      "p.pm_equilibrium"
+    ],
+    [
+      "a.windsea_swell_split",
+      "derives_from",
+      "p.windsea_swell"
+    ],
+    [
+      "a.gbdt_direct",
+      "derives_from",
+      "p.rmse_optimum"
+    ],
+    [
+      "a.log_target",
+      "derives_from",
+      "p.rmse_optimum"
+    ],
+    [
+      "a.seq_model",
+      "requires",
+      "f.env"
+    ],
+    [
+      "a.external_pretrain",
+      "requires",
+      "r.permissive"
+    ],
+    [
+      "p.swell_blind",
+      "derives_from",
+      "p.windsea_swell"
+    ],
+    [
+      "p.season_proxy",
+      "derives_from",
+      "f.no_time_col"
+    ],
+    [
+      "f.persistence_bias",
+      "measures",
+      "a.lead_shrinkage"
+    ],
+    [
+      "f.selection_replicated",
+      "measures",
+      "g.cv"
+    ],
+    [
+      "f.pipeline_verified",
+      "measures",
+      "g.pipeline"
+    ],
+    [
+      "r.context_only",
+      "forbids",
+      "a.transductive_stats"
+    ],
+    [
+      "f.t1_oof",
+      "measures",
+      "a.gbdt_direct"
+    ],
+    [
+      "s.t1_submission",
+      "derives_from",
+      "f.t1_oof"
+    ],
+    [
+      "s.t1f_submission",
+      "derives_from",
+      "f.t1f_outer"
+    ],
+    [
+      "a.station_lead_experts",
+      "derives_from",
+      "f.gefcom2014_gbm"
+    ],
+    [
+      "a.station_lead_experts",
+      "derives_from",
+      "f.m5_grouped_lgbm"
+    ],
+    [
+      "a.strict_forward_nested",
+      "requires",
+      "r.context_only"
+    ],
+    [
+      "f.p3_forward_foundation",
+      "derives_from",
+      "a.strict_forward_nested"
+    ],
+    [
+      "f.p3_shift_risk",
+      "requires",
+      "r.context_only"
+    ],
+    [
+      "f.p3_t2_runtime_stop",
+      "derives_from",
+      "a.station_lead_experts"
+    ],
+    [
+      "f.t5_rejudge",
+      "derives_from",
+      "f.t2_outer_gain"
+    ],
+    [
+      "f.t8_dense_fold1",
+      "derives_from",
+      "f.gated_weight_overfit"
+    ],
+    [
+      "f.t9_weighted_dense",
+      "derives_from",
+      "f.dense_judge_bias"
+    ],
+    [
+      "f.t9_weighted_dense",
+      "measures",
+      "f.thinned_judge_inverts"
+    ]
+  ]
+}

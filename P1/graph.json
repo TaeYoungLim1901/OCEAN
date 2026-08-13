@@ -1,0 +1,248 @@
+{
+  "meta": {
+    "problem": "P1",
+    "title": "종합해양과학기지 관측 수온 자동 품질관리",
+    "metric": "행 단위 양성 F1",
+    "updated": "2026-08-13",
+    "id_prefix": {
+      "r.": "rule",
+      "f.": "fact",
+      "p.": "physics",
+      "a.": "axis",
+      "s.": "asset",
+      "g.": "gate"
+    }
+  },
+  "nodes": [
+    {
+      "id": "r.raw_readonly",
+      "type": "rule",
+      "t": "P1_data 원본은 읽기 전용이며 재배포하지 않는다",
+      "src": "AGENTS.md §6, P1_data/README",
+      "hard": true
+    },
+    {
+      "id": "r.metric",
+      "type": "rule",
+      "t": "순위 지표는 이상 label=1의 행 단위 F1; anomaly_type은 순위 미반영",
+      "src": "P1CONTEXT 1-6",
+      "hard": true
+    },
+    {
+      "id": "r.reproduce",
+      "type": "rule",
+      "t": "최종 코드가 업로드 예측을 재현해야 한다",
+      "src": "P1CONTEXT 제출 안내 2-3",
+      "hard": true
+    },
+    {
+      "id": "r.permissive",
+      "type": "rule",
+      "t": "명시적으로 금지되지 않은 것은 허용하되 근거를 남긴다",
+      "src": "사용자 지시 2026-08-13",
+      "hard": false
+    },
+    {
+      "id": "r.offline_centered",
+      "type": "rule",
+      "t": "test 전체 시계열이 한꺼번에 주어지는 offline 행 판정이며 실시간·인과 제약이 명시되지 않아, 같은 raw stream의 양측 centered context를 허용한다. label·다른 test stream의 집계 통계는 사용하지 않는다",
+      "src": "P1CONTEXT 1-2(배포된 수온 시계열의 각 시점 판정), 1-5(test.csv 전체 배포), r.permissive",
+      "hard": false
+    },
+    {
+      "id": "f.train_test_time",
+      "type": "fact",
+      "t": "train 2024~2025, test 2026 상반기이며 정점·층 운영기간이 불균형",
+      "src": "P1CONTEXT, EDA 2026-08-13"
+    },
+    {
+      "id": "f.gaps",
+      "type": "fact",
+      "t": "대부분 10분 간격이나 station-layer stream별 관측 gap 존재",
+      "src": "EDA 2026-08-13"
+    },
+    {
+      "id": "f.synthetic",
+      "type": "fact",
+      "t": "이상 비율과 지속시간은 실제 장애 통계가 아닌 대회용 합성 설정",
+      "src": "P1CONTEXT 1-1"
+    },
+    {
+      "id": "p.stratification",
+      "type": "physics",
+      "t": "성층·내부파로 한 층만 정상 급변할 수 있어 고정 층간 임계값은 오탐 위험",
+      "src": "P1CONTEXT 1-4; DOMAIN_RESEARCH"
+    },
+    {
+      "id": "a.type_detectors",
+      "type": "axis",
+      "status": "open",
+      "t": "spike/noise/flatline/offset/drift 유형별 다중창 검출기 결합"
+    },
+    {
+      "id": "a.lgbm",
+      "type": "axis",
+      "status": "open",
+      "t": "LightGBM이 유형별 시계열 feature를 행별 분류"
+    },
+    {
+      "id": "a.ensemble",
+      "type": "axis",
+      "status": "open",
+      "t": "규칙 점수와 LightGBM 확률을 OOF에서 결합"
+    },
+    {
+      "id": "f.haicon_top",
+      "type": "fact",
+      "t": "HAICon 2020 상위 7팀은 예측잔차 baseline 계열을 개선했으며 주최자 분석은 전처리·잔차 후처리·다중 시간창 ensemble의 영향이 모델 자체보다 컸다고 보고했다",
+      "src": "https://doi.org/10.1145/3474718.3474719 §4.2; COMPETITION_RESEARCH.md"
+    },
+    {
+      "id": "f.vsb_drift",
+      "type": "fact",
+      "t": "VSB 9위 해법은 adversarial AUC로 train/test shift를 진단하고 필터·feature 제거 뒤 source AUC를 낮춰 보수적 모델을 선택했다",
+      "src": "https://www.kaggle.com/competitions/vsb-power-line-fault-detection/writeups/ngyope-9th-place-solution-overview"
+    },
+    {
+      "id": "a.forward_nested",
+      "type": "axis",
+      "status": "open",
+      "t": "fold1·2는 과거만 학습하고 fold3는 봉인하는 strictly-forward nested 검증"
+    },
+    {
+      "id": "a.type_multiclass",
+      "type": "axis",
+      "status": "closed",
+      "t": "유형 multiclass 확률을 1-P(normal)로 합쳐 binary detector와 보수적으로 blend",
+      "evidence": "exp003 forward inner 선택 후 inner-locked tree count로 본 sealed outer F1 0.760045, exp002 0.766423 대비 -0.006379; residual corr 0.850584지만 안전 blend 허용 하한 -0.002 미달"
+    },
+    {
+      "id": "a.adversarial_drift",
+      "type": "axis",
+      "status": "closed",
+      "t": "시간 전반 학습→후반 평가 source classifier로 train/test drift를 진단",
+      "evidence": "exp003 source AUC 0.850133; 주요 구분 feature month, psal, doy_sin, clim_resid, layer_count. 진단 완료, target 선택에는 미사용"
+    },
+    {
+      "id": "a.random_rows",
+      "type": "axis",
+      "status": "closed",
+      "t": "랜덤 행 CV",
+      "evidence": "연속 주입구간과 rolling window 이웃이 양쪽 분할에 들어가 누수"
+    },
+    {
+      "id": "g.data",
+      "type": "gate",
+      "t": "python P1/src/check.py data — 스키마·키·라벨·시간·원본 행수"
+    },
+    {
+      "id": "g.pipeline",
+      "type": "gate",
+      "t": "python P1/src/check.py pipeline — OOF/test 길이와 제출 생산경로"
+    },
+    {
+      "id": "g.sub",
+      "type": "gate",
+      "t": "python P1/src/check.py sub — 제출 열·키·label 검증"
+    },
+    {
+      "id": "f.exp005_result",
+      "type": "fact",
+      "t": "exp005 selected w=0.00 t=0.62 hole=48 r=0.030 lambda=0.00; sealed outer F1=0.815757 TP=5612 FP=704 FN=1831; exp004 delta=+0.006992; sha=5E5B8840C3A6FC5E6C8A8DFD461E419E9795548492C566E27758EE5BD0185F5A",
+      "src": "P1/specs/T8-exp005-consistent-scoring.md; P1/cache/exp005_meta.json"
+    },
+    {
+      "id": "a.rate_anchoring",
+      "type": "axis",
+      "t": "stream 별 target 양성률(4.1% 주입 사전)로 threshold 를 앵커링해 test 과소예측 교정",
+      "src": "T9 B3",
+      "status": "closed",
+      "evidence": "T9 B3: inner 최고 0.689435 (r .030 lambda .50) < 전역 threshold 0.697836. lambda=1.0 은 0.423717~0.599093 로 붕괴. r 8종 x lambda 4종 전부 패배"
+    },
+    {
+      "id": "f.score_path_mismatch",
+      "type": "fact",
+      "t": "exp004 는 test 점수를 booster 4개 평균으로 냈고 튜닝은 fold 당 단일 모델 점수 위에서 했다. 평균이 확률을 압축해(test p50 0.003126 vs 단일 0.000004) threshold 0.54 에서 test 양성률이 0.032039 로 train 0.041362 보다 낮아졌다. exp005 가 4경로를 단일 모델로 통일해 해소",
+      "src": "T7 C8, T8 분포표"
+    },
+    {
+      "id": "f.inner_symmetric_purge_leak",
+      "type": "fact",
+      "t": "features.py:121 train_mask_with_purge 는 대칭 마스크라 held_out=1 이면 학습에 fold2,3 가 들어간다. exp001 booster 로 만든 inner OOF 가 미래를 봤고 exp004 inner F1 0.762702 는 낙관. forward 재구성 후 정직한 inner 는 0.697836",
+      "src": "T7 감사, T8 1단계"
+    },
+    {
+      "id": "f.exp005_optimum",
+      "type": "fact",
+      "t": "확장 격자(hole 24~400, threshold 0.30~0.96, weight 0~0.60)에서 inner 최적은 weight 0.00 / threshold 0.62 / hole 48, inner F1 0.697836. hole·threshold 모두 내부 최고점. rule_score 단독 inner F1 0.174346, lgbm 과 Spearman 0.055173",
+      "src": "T9 A2 B1 B2"
+    }
+  ],
+  "edges": [
+    [
+      "f.gaps",
+      "requires",
+      "a.type_detectors"
+    ],
+    [
+      "f.train_test_time",
+      "closes",
+      "a.random_rows"
+    ],
+    [
+      "r.reproduce",
+      "requires",
+      "g.pipeline"
+    ],
+    [
+      "r.metric",
+      "requires",
+      "g.sub"
+    ],
+    [
+      "r.offline_centered",
+      "requires",
+      "a.type_detectors"
+    ],
+    [
+      "a.ensemble",
+      "derives_from",
+      "a.type_detectors"
+    ],
+    [
+      "a.ensemble",
+      "derives_from",
+      "a.lgbm"
+    ],
+    [
+      "a.type_multiclass",
+      "derives_from",
+      "f.haicon_top"
+    ],
+    [
+      "a.ensemble",
+      "derives_from",
+      "f.haicon_top"
+    ],
+    [
+      "a.adversarial_drift",
+      "derives_from",
+      "f.vsb_drift"
+    ],
+    [
+      "f.train_test_time",
+      "requires",
+      "a.forward_nested"
+    ],
+    [
+      "f.exp005_result",
+      "derives_from",
+      "a.forward_nested"
+    ],
+    [
+      "f.exp005_result",
+      "measures",
+      "g.sub"
+    ]
+  ]
+}
