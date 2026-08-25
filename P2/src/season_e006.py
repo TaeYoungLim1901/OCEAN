@@ -9,6 +9,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
+from submission_tools import save_pool_pred
 import train_e003 as E3
 from gate_e004 import holdout, regimes, score
 from train_e003 import fit_eof, fit_layers, predict_eof, predict_layers
@@ -209,8 +210,8 @@ def main():
             "e004": e004_report, "maskaug": e006_report,
             "source": "existing E004 OOF" if label == "S1" else "seasonal E004-style refit",
         }
-        np.save(C.ROOT / "preds" / f"oof_maskaug_{label}_E006.npy", e006)
-        np.save(cache / f"oof_maskaug_{label}_E006.npy", e006)
+        save_pool_pred(C.ROOT / "preds" / f"oof_maskaug_{label}_E006.npy", e006)
+        save_pool_pred(cache / f"oof_maskaug_{label}_E006.npy", e006)
         _write_json(cache / f"metrics_{label}.json", reports[label])
         elapsed = time.perf_counter() - hold_started
         runtime["windows"][label] = {"seconds": elapsed, "completed": True,
@@ -315,7 +316,7 @@ def main():
     print(f"R5 | {int(complete_equal)} | {'pass' if rules['R5'] else 'fail'}")
 
     if accepted:
-        np.save(C.ROOT / "preds" / "test_gate_maskaug_E006.npy", test_final)
+        save_pool_pred(C.ROOT / "preds" / "test_gate_maskaug_E006.npy", test_final)
         test_index = pd.read_csv(C.DATA / "test_index.csv")
         test_index[C.KEY].assign(temp=test_final).to_csv(
             C.ROOT / "subs" / "E006_gate.csv", index=False

@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
+from submission_tools import save_pool_pred
 
 
 def estimator(name):
@@ -51,7 +52,10 @@ def scores(val, xval, pred):
 def main():
     obs = C.load_obs()
     train, val = C.split_rows(obs)
-    xtr, xval = C.build_features(obs, train), C.build_features(obs, val)
+    hold = obs.time.between(val.time.min(), val.time.max()) & obs.layer.isin(C.TARGET_LAYERS)
+    obs_train = obs.loc[~hold].copy()
+    feature_source = obs_train
+    xtr, xval = C.build_features(feature_source, train), C.build_features(feature_source, val)
     predictions = {"baseline_nom": xval.base_nom.to_numpy(), "baseline_actual": xval.base_actual.to_numpy()}
     fitted = {}
     for name, columns in (("ridge_full", C.FULL), ("lgb_basic", C.BASIC), ("lgb_full", C.FULL)):
@@ -73,14 +77,15 @@ def main():
     selected = min(near, key=lambda n: (n.startswith("blend_"), order.get(n, 9), report[n]["overall"]))
 
     for name, pred in predictions.items():
-        np.save(C.ROOT / "preds" / f"oof_{name}_E001.npy", pred)
+        save_pool_pred(C.ROOT / "preds" / f"oof_{name}_E001.npy", pred)
     answer = val[C.KEY + ["temp"]]
     answer.to_csv(C.ROOT / "cache" / "E001" / "val_answer.csv", index=False)
     val[C.KEY].assign(temp=predictions[selected]).to_csv(C.ROOT / "cache" / "E001" / "val_selected.csv", index=False)
 
     # 최종 모델은 배포된 모든 라벨을 사용한다.
     all_rows = obs[obs.layer.isin(C.TARGET_LAYERS) & obs.temp.notna()].reset_index(drop=True)
-    xall = C.build_features(obs, all_rows)
+    feature_source = obs
+    xall = C.build_features(feature_source, all_rows)
     final = {}
     for name, columns in (("ridge_full", C.FULL), ("lgb_basic", C.BASIC), ("lgb_full", C.FULL)):
         final[name] = {}
@@ -102,4 +107,3 @@ def main():
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     main()
-

@@ -45,9 +45,9 @@ def main():
                           "strict": bool((train_times < cutoff).all())}
         forward[str(fold)] = {"train": int(mask.sum()), "val": int((folds == fold).sum()),
                               "station_checks": checks}
-    pred_paths = {"damped": PREDS / "oof_damped_p3_t1.npy",
-                  "lgbm": PREDS / "oof_lgbm_p3_t1.npy",
-                  "t1f": PREDS / "oof_final_p3_t1f.npy"}
+    pred_paths = {"damped": P3 / "cache" / "p3_t1" / "oof_damped_p3_t1.npy",
+                  "lgbm": P3 / "cache" / "p3_t1" / "oof_lgbm_p3_t1.npy",
+                  "t1f": P3 / "cache" / "p3_t1" / "oof_final_p3_t1f.npy"}
     preds = {name: np.load(path) for name, path in pred_paths.items()}
     selection = np.isin(folds, [1, 2, 3])
     residual_corr = {}

@@ -8,6 +8,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
+from submission_tools import save_pool_pred
 
 SEED = 42
 CANDIDATES = ("eof", "enhanced", "robust_blend")
@@ -185,8 +186,8 @@ def main():
     for cand in CANDIDATES:
         gated_oof[cand] = np.concatenate(gated_oof[cand])
         gated_test[cand] = np.where(test_flags, test["e002"], test[cand])
-        np.save(C.ROOT / "preds" / f"oof_gate_{cand}_E004.npy", gated_oof[cand])
-        np.save(C.ROOT / "preds" / f"test_gate_{cand}_E004.npy", gated_test[cand])
+        save_pool_pred(C.ROOT / "preds" / f"oof_gate_{cand}_E004.npy", gated_oof[cand])
+        save_pool_pred(C.ROOT / "preds" / f"test_gate_{cand}_E004.npy", gated_test[cand])
 
     rules = {cand: _rule_values(reports, cand) for cand in CANDIDATES}
     selected = next((cand for cand in CANDIDATES if rules[cand]["passed"]), "E002")

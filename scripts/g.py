@@ -110,6 +110,16 @@ def cmd_close(g, a):
     return 0
 
 
+def cmd_set(g, a):
+    n = find(g, a.id)
+    if not n:
+        sys.exit(f"노드 없음: {a.id}")
+    n[a.field] = a.value
+    save(a.p, g)
+    print("수정 " + line(n))
+    return 0
+
+
 def cmd_edge(g, a):
     if a.rel not in RELS:
         sys.exit(f"관계는 {RELS}")
@@ -161,6 +171,7 @@ def main():
     s = sub.add_parser("add"); s.add_argument("id"); s.add_argument("type"); s.add_argument("text")
     s.add_argument("--src"); s.add_argument("--status"); s.set_defaults(f=cmd_add)
     s = sub.add_parser("close"); s.add_argument("id"); s.add_argument("--evidence", required=True); s.set_defaults(f=cmd_close)
+    s = sub.add_parser("set"); s.add_argument("id"); s.add_argument("field", choices=("t", "src")); s.add_argument("value"); s.set_defaults(f=cmd_set)
     s = sub.add_parser("edge"); s.add_argument("src"); s.add_argument("rel"); s.add_argument("dst"); s.set_defaults(f=cmd_edge)
     s = sub.add_parser("selftest"); s.set_defaults(f=cmd_selftest)
     a = ap.parse_args()

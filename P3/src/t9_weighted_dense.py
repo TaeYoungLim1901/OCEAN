@@ -11,6 +11,7 @@ import pandas as pd
 
 import cases as C
 import metric as M
+from submission_tools import save_pool_pred
 
 sys.stdout.reconfigure(encoding="utf-8")
 P3 = pathlib.Path(__file__).resolve().parent.parent
@@ -266,7 +267,7 @@ def main():
         final = np.clip(blend(test_pred, w_new), 0.0, 30.0)
         pred_path = PRED / "test_final_p3_t9.npy"
         sub_path = P3 / "subs" / "submission_p3_t9.csv"
-        np.save(pred_path, final)
+        final = np.load(save_pool_pred(pred_path, final), allow_pickle=False)
         sub = test_index.copy()
         sub["hs_pred"] = final.reshape(-1)
         sub.to_csv(sub_path, index=False)

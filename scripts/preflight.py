@@ -7,7 +7,7 @@
 
 `판정: OK` 가 아니면 codex 를 부르지도, 제출하지도 마라.
 """
-import argparse, pathlib, re, sys
+import argparse, hashlib, json, pathlib, re, subprocess, sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -101,7 +101,20 @@ def cmd_sub(a):
 
 
 def cmd_selftest(a):
-    import pandas as pd, tempfile, os
+    bad_eol = [str(p.relative_to(ROOT)) for p in (ROOT / "scripts").glob("*.sh")
+               if b"\r\n" in p.read_bytes() or b"\r" in p.read_bytes()]
+    if bad_eol:
+        print("selftest FAIL CR line endings: " + ", ".join(bad_eol))
+        return 1
+    try:
+        import pandas as pd, tempfile, os
+    except ModuleNotFoundError:
+        import tempfile
+        d = pathlib.Path(tempfile.mkdtemp())
+        (d / "s.md").write_text("가설 하나", encoding="utf-8")
+        assert cmd_spec(argparse.Namespace(path=d / "s.md")) == 1
+        print("selftest OK (sub dependencies unavailable)")
+        return 0
     d = pathlib.Path(tempfile.mkdtemp())
     idx = pd.DataFrame({"case_id": ["C1"] * 6, "station": ["G-ORS"] * 6, "lead_h": LEADS})
     idx.to_csv(d / "idx.csv", index=False)
@@ -122,6 +135,128 @@ def cmd_selftest(a):
     return 0
 
 
+RULE_COPY_PATHS = [
+    "AGENTS.md", "CLAUDE.md", "PLAYBOOK.md", "P1/AGENTS.md", "P2/AGENTS.md", "P3/AGENTS.md",
+    "P1/NEXT.md", "P2/NEXT.md", "P3/NEXT.md", "P1/graph.json", "P2/graph.json", "P3/graph.json",
+]
+RULE_COPY_PATTERNS = [
+    r"9\s*[.월]\s*7", r"2026-09-07", r"09/07", r"하루\s*3\s*회", r"일\s*3\s*회", r"3\s*회/일",
+]
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest().upper()
+
+
+def cmd_rules(a):
+    try:
+        import rules_runtime
+        values = rules_runtime.load()
+    except Exception as e:
+        return verdict([f"rules_runtime 예외: {type(e).__name__}: {e}"], [])
+    fails = []
+    paths = [ROOT / p for p in RULE_COPY_PATHS]
+    paths.extend(sorted(ROOT.glob("OPUS_HANDOFF_*.md")))
+    for path in paths:
+        if not path.is_file():
+            continue
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if any(re.search(pattern, line) for pattern in RULE_COPY_PATTERNS):
+                fails.append(f"{path.relative_to(ROOT)}:{line_no}")
+    for key in ("deadline_pred", "deadline_model", "quota_per_problem_per_day", "submit_open"):
+        value = values[key]
+        rendered = value.isoformat() if hasattr(value, "isoformat") else value
+        print(f"  {key}={rendered}")
+    return verdict(fails, [])
+
+
+def _manifest_path(csv_path):
+    return csv_path.with_suffix(".manifest.json")
+
+
+def _check_hash(fails, label, path, expected):
+    if not expected:
+        fails.append(f"{label} sha256 누락")
+    elif sha(path) != str(expected).upper():
+        fails.append(f"{label} sha256 불일치")
+
+
+def _check_manifest(problem, csv_arg, fails):
+    csv_path = rel(csv_arg)
+    manifest_path = _manifest_path(csv_path)
+    if not manifest_path.is_file():
+        fails.append(f"{problem} manifest 없음: {manifest_path.relative_to(ROOT)}")
+        return
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        fails.append(f"{problem} manifest 읽기 실패: {type(e).__name__}")
+        return
+    try:
+        if rel(manifest["csv"]).resolve() != csv_path.resolve():
+            fails.append(f"{problem} manifest csv 경로 불일치")
+    except (KeyError, TypeError):
+        fails.append(f"{problem} csv 스키마 오류")
+    if not csv_path.is_file():
+        fails.append(f"{problem} csv 없음: {csv_path}")
+    else:
+        _check_hash(fails, f"{problem} csv", csv_path, manifest.get("csv_sha256"))
+    try:
+        pred_path = rel(manifest["pred_npy"])
+        if not pred_path.is_file():
+            fails.append(f"{problem} pred_npy 없음: {pred_path}")
+        else:
+            _check_hash(fails, f"{problem} pred_npy", pred_path, manifest.get("pred_sha256"))
+    except (KeyError, TypeError):
+        fails.append(f"{problem} pred_npy 스키마 오류")
+    for group in ("code_files", "weights"):
+        entries = manifest.get(group)
+        if not isinstance(entries, dict):
+            fails.append(f"{problem} {group} 스키마 오류")
+            continue
+        if not entries:
+            fails.append(f"{problem} {group} 비어 있음")
+        for name, expected in entries.items():
+            path = rel(name)
+            if not path.is_file():
+                fails.append(f"{problem} {group} 없음: {name}")
+            else:
+                _check_hash(fails, f"{problem} {group} {name}", path, expected)
+
+
+def _run_gate(label, command, fails):
+    try:
+        result = subprocess.run(
+            [sys.executable, *command], cwd=ROOT, text=True, encoding="utf-8", errors="replace", capture_output=True,
+        )
+    except Exception as e:
+        fails.append(f"{label} 실행 예외: {type(e).__name__}")
+        return
+    for line in (result.stdout or "").splitlines()[-3:]:
+        print(f"  {label}: {line}")
+    print(f"  {label}: exit={result.returncode}")
+    if result.returncode:
+        fails.append(f"{label} exit={result.returncode}")
+
+
+def cmd_final(a):
+    fails = []
+    for problem, csv_arg in (("P1", a.p1), ("P2", a.p2), ("P3", a.p3)):
+        csv_path = str(csv_arg)
+        _run_gate(f"{problem} bugcheck", [f"{problem}/src/bugcheck.py", "all"], fails)
+        _run_gate(f"{problem} final", [f"{problem}/src/check.py", "final", csv_path], fails)
+        _check_manifest(problem, csv_arg, fails)
+    _run_gate("rules", ["scripts/preflight.py", "rules"], fails)
+    for failure in fails:
+        print(f"  FAIL {failure}")
+    print("판정: " + ("READY" if not fails else "NOT READY"))
+    return 0 if not fails else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -129,6 +264,11 @@ def main():
     s = sub.add_parser("sub"); s.add_argument("path"); s.add_argument("--index", required=True)
     s.add_argument("--base"); s.set_defaults(f=cmd_sub)
     s = sub.add_parser("selftest"); s.set_defaults(f=cmd_selftest)
+    s = sub.add_parser("rules"); s.set_defaults(f=cmd_rules)
+    s = sub.add_parser("final");
+    for name in ("p1", "p2", "p3"):
+        s.add_argument(f"--{name}", required=True)
+    s.set_defaults(f=cmd_final)
     a = ap.parse_args()
     sys.exit(a.f(a))
 

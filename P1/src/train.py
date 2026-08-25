@@ -11,7 +11,17 @@ sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from features import make_features, time_folds, train_mask_with_purge, SEED
-from metric import evaluate, f1
+
+EXPERIMENT_ID = "t19"
+
+
+def fresh_cache():
+    legacy = [ROOT / "cache" / name for name in ("exp001", "exp004")]
+    if any(path.exists() for path in legacy):
+        raise SystemExit("legacy exp001/exp004 cache is forbidden for T19 training")
+    path = ROOT / "cache" / EXPERIMENT_ID
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def segment_ids(raw):
@@ -38,8 +48,10 @@ def fill_short_gaps(pred, raw, max_gap, segments=None):
 
 
 def main():
+    from metric import evaluate, f1
+    from submission_tools import save_pool_pred
     train = pd.read_csv(ROOT / "P1_data/train.csv")
-    cache = ROOT / "cache/exp001"
+    cache = fresh_cache()
     cached = (cache / "train_features.pkl").exists() and all((cache / f"model_fold{i}.txt").exists() for i in range(4))
     if cached:
         x = pd.read_pickle(cache / "train_features.pkl")
@@ -48,10 +60,9 @@ def main():
         x, ref = make_features(train)
     y = train.label.to_numpy(np.int8)
     folds = time_folds(train)
-    np.save(ROOT / "cache/exp001/folds.npy", folds)
-    (ROOT / "cache/exp001/reference.json").write_text(json.dumps(ref), encoding="utf-8")
-    x.to_pickle(ROOT / "cache/exp001/train_features.pkl")
-    oof_path = ROOT / "preds/oof_lgbm_exp001.npy"
+    np.save(cache / "folds.npy", folds)
+    (cache / "reference.json").write_text(json.dumps(ref), encoding="utf-8")
+    x.to_pickle(cache / "train_features.pkl")
     oof = np.zeros(len(train), np.float32)
     best_iters = []
     params = dict(objective="binary", learning_rate=0.05, num_leaves=63, max_depth=-1,
@@ -67,15 +78,13 @@ def main():
                   callbacks=[lgb.early_stopping(60, verbose=False), lgb.log_evaluation(0)])
         oof[va] = model.predict_proba(x.loc[va], num_iteration=model.best_iteration_)[:, 1]
         best_iters.append(model.best_iteration_)
-        model.booster_.save_model(ROOT / f"cache/exp001/model_fold{fold}.txt")
+        model.booster_.save_model(cache / f"model_fold{fold}.txt")
     if cached:
         for fold in range(4):
             va = folds == fold
-            model = lgb.Booster(model_file=ROOT / f"cache/exp001/model_fold{fold}.txt")
+            model = lgb.Booster(model_file=cache / f"model_fold{fold}.txt")
             oof[va] = model.predict(x.loc[va], num_iteration=model.best_iteration)
             best_iters.append(model.best_iteration)
-    np.save(oof_path, oof)
-
     # 결과를 보기 전 고정한 작은 grid: threshold, 규칙 혼합, event 내부 1~2행 hole만 비교.
     rule = x.rule_score.to_numpy()
     candidates = []
@@ -94,15 +103,15 @@ def main():
     oof_submit = np.clip(final_score - threshold + 0.5, 0, 1).astype(np.float32)
     oof_submit[final_pred] = np.maximum(oof_submit[final_pred], 0.5)
     oof_submit[~final_pred] = np.minimum(oof_submit[~final_pred], np.nextafter(np.float32(0.5), np.float32(0)))
-    np.save(ROOT / "preds/oof_lgbm_exp001.npy", oof_submit)
+    save_pool_pred(ROOT / f"preds/oof_lgbm_{EXPERIMENT_ID}.npy", oof_submit)
     meta = {"weight": weight, "threshold": threshold, "fill_gap": gap,
             "best_iterations": best_iters, "oof_f1": score, "tp": tp, "fp": fp, "fn": fn,
             "features": list(x.columns)}
-    (ROOT / "cache/exp001/meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    (cache / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     type_scores = evaluate(train.assign(anomaly_type=train.anomaly_type.fillna("normal")), final_pred, ["anomaly_type"])
     sl_scores = evaluate(train, final_pred, ["station", "layer"])
-    type_scores.to_csv(ROOT / "experiments/exp001_by_type.csv", index=False)
-    sl_scores.to_csv(ROOT / "experiments/exp001_by_station_layer.csv", index=False)
+    type_scores.to_csv(ROOT / f"experiments/{EXPERIMENT_ID}_by_type.csv", index=False)
+    sl_scores.to_csv(ROOT / f"experiments/{EXPERIMENT_ID}_by_station_layer.csv", index=False)
     rule_pred = rule >= 0.5
     rule_f1 = f1(y, rule_pred)[0]
     err_corr = np.corrcoef((y - (oof >= threshold)), (y - rule_pred))[0, 1]

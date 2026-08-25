@@ -12,6 +12,7 @@ import pandas as pd
 import cases as C
 import metric as M
 from features import extract
+from submission_tools import save_pool_pred
 from train import expand, target_delta
 from train_t2 import forward_train_mask
 
@@ -214,14 +215,14 @@ def main():
         scores[name]["folds1_3_mean"] = float(np.mean([scores[name][f"fold{f}"] for f in (1, 2, 3)]))
         scores[name]["fold4_unweighted"] = unweighted_rmse(
             dense.loc[fold == 4].reset_index(drop=True), y[fold == 4], oof[name][fold == 4])
-        np.save(PREDS / f"oof_{name}_{EXP}.npy", oof[name])
+        save_pool_pred(PREDS / f"oof_{name}_{EXP}.npy", oof[name])
 
     test_cases, test_x = load_test()
     full_test = {}
     full_iterations = {}
     for name in CANDIDATES:
         full_test[name], full_iterations[name] = fit_full(name, x, cases, test_x, test_cases)
-        np.save(PREDS / f"test_{name}_{EXP}.npy", full_test[name])
+        save_pool_pred(PREDS / f"test_{name}_{EXP}.npy", full_test[name])
 
     ess = {f"fold{value}": float(weights[fold == value].sum() ** 2 /
                                   np.square(weights[fold == value]).sum())
@@ -289,8 +290,8 @@ def main():
         raise RuntimeError("saved test baseline shape mismatch")
     final_test = np.einsum("i,inj->nj", weight,
                            np.concatenate([test_saved, full_test[chosen][None]], axis=0)).clip(0, 30)
-    np.save(PREDS / f"oof_final_{EXP}.npy", final_oof)
-    np.save(PREDS / f"test_final_{EXP}.npy", final_test)
+    save_pool_pred(PREDS / f"oof_final_{EXP}.npy", final_oof)
+    final_test = np.load(save_pool_pred(PREDS / f"test_final_{EXP}.npy", final_test), allow_pickle=False)
     fold4 = fold == 4
     fold4_score = weighted_rmse(y[fold4], final_oof[fold4], weights[fold4])
     report["task1"] = {

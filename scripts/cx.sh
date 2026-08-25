@@ -10,6 +10,11 @@
 # ⚠ -f 는 샌드박스를 완전히 해제한다. 학습·실험 사양에는 쓰지 마라.
 set -euo pipefail
 
+if [ "${OCEAN_CX:-}" = "1" ]; then
+  echo "codex 안에서 codex 를 부를 수 없다" >&2
+  exit 2
+fi
+
 sandbox="workspace-write"
 model="gpt-5.6-luna"
 effort="xhigh"
@@ -52,7 +57,8 @@ usersite="$(python -c 'import site;print(site.getusersitepackages())' 2>/dev/nul
 # shell_environment_policy 로 직접 주입한다 (2026-08-13 T6·T8 2회 실패).
 # 값은 TOML 로 파싱된다. Windows 경로의 백슬래시가 basic string 에서는 잘못된 이스케이프(\U)라
 # 통째로 무시된다. TOML literal string(작은따옴표)을 써야 한다.
-[ -n "$usersite" ] && env_inject=(-c "shell_environment_policy.set.PYTHONPATH='${usersite}'")
+env_inject=(-c "shell_environment_policy.set.OCEAN_CX='1'")
+[ -n "$usersite" ] && env_inject=(-c "shell_environment_policy.set.PYTHONPATH='${usersite}'" "${env_inject[@]}")
 
 {
   echo "Codex CLI가 자동 로드한 루트 AGENTS.md가 최상위 규약이다. 전문을 다시 출력하지 말고 준수하라."

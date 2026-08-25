@@ -29,6 +29,7 @@ train은 2024~2025년, test는 2026년이며 지표는 양성 F1이다.
 
 ```bash
 python P1/src/check.py data
+python P1/src/check.py hashes
 python P1/src/check.py pipeline P1/subs/exp001.csv P1/preds/oof_lgbm_exp001.npy P1/preds/test_lgbm_exp001.npy
 python P1/src/check.py sub P1/subs/exp001.csv
 python P1/src/submission_tools.py audit P1/subs/exp002.csv --pred P1/preds/test_exp002.npy

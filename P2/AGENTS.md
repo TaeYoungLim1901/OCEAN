@@ -26,6 +26,7 @@ python P2/src/check.py pipeline
 python P2/src/check.py cases
 python P2/src/check.py sub P2/subs/E001_lgb_full.csv
 python P2/src/check.py reproduce
+python P2/src/check.py hashes
 python P2/src/submission_tools.py audit P2/subs/E002_final.csv --pred P2/preds/test_fixed_depth_E002.npy
 ```
 

@@ -13,6 +13,7 @@ import pandas as pd
 import cases as C
 import metric as M
 from features import extract
+from submission_tools import save_pool_pred
 from train import expand, target_delta
 from train_t2 import fit_damped, forward_train_mask, predict_damped
 
@@ -145,7 +146,7 @@ def checkpoint_predictions(path, mask, expected_n):
 
 def save_oof(oof):
     for name in CANDIDATES:
-        np.save(PREDS / f"oof_{name}_{EXP}.npy", oof[name])
+        np.save(CACHE / f"oof_{name}_{EXP}.npy", oof[name])
 
 
 def run_train(max_folds, n_jobs):
@@ -210,6 +211,10 @@ def run_train(max_folds, n_jobs):
             print(f"[t8] fold={fold} candidate={name} "
                   f"val_rmse={rmse(y[mask], oof[name][mask]):.6f}", flush=True)
         save_oof(oof)
+
+    if max_folds == 4:
+        for name in CANDIDATES:
+            save_pool_pred(PREDS / f"oof_{name}_{EXP}.npy", oof[name])
 
     print(f"[t8] fold_train_sizes={json.dumps(fold_sizes, ensure_ascii=False)}", flush=True)
     if max_folds < 4:

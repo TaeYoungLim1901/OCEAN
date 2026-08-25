@@ -9,6 +9,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 from train import estimator
+from submission_tools import save_pool_pred
 
 HOLDS = {
     "2024": (pd.Timestamp("2024-09-01", tz="Asia/Seoul"),
@@ -97,7 +98,7 @@ def main():
             xtrain = C.build_features(work, train, tide_correct=tide_correct, use_target_depth=use_depth)
             xval = C.build_features(work, val, tide_correct=tide_correct, use_target_depth=use_depth)
             pred = predict(fit_models(xtrain, train), xval, val)
-            np.save(C.ROOT / "preds" / f"oof_{name}_{label}_E002.npy", pred)
+            save_pool_pred(C.ROOT / "preds" / f"oof_{name}_{label}_E002.npy", pred)
             report[label][name] = score(val, xval, pred)
 
     means = {name: np.mean([report[label][name]["overall"] for label in HOLDS])

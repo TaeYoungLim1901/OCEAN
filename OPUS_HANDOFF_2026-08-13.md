@@ -1,6 +1,8 @@
 # Opus handoff — 2026-08-13
 
 상위 실행 계약은 `CLAUDE.md` → `AGENTS.md` → 각 `P{n}/AGENTS.md` 순서로 읽는다.
+
+**세션 진입점은 문제와 무관하게 `P{n}/NEXT.md` 하나다.** 세션 첫 입력: `P{n} 세션. P{n}/NEXT.md 부터.` (2026-08-26 통일. `P3/START.md` 는 `P3/NEXT.md` 로 개명)
 아래 3개만 현재 제출 가능 후보이며, Public 점수는 아직 기록되지 않았다.
 
 | 문제 | 현재 제출 후보 | SHA-256 | 로컬 판정 |
@@ -82,8 +84,31 @@ fold4 이후다. 최근성 가중 판정기는 `W_old` 를 강화할 뿐이라 �
   상관 `0.90` 미만은 `damped`(0.842)·`persistence`(0.746) 둘뿐이고 **그 3개가 이미 T1F 구성**이다
   (`f.pool_no_diversity`). 동일가중 블렌드 봉인 fold4 `0.653256` = T1F 대비 `+0.041297` 악화
 
-**남은 유일한 자는 public LB 다.** 계획은 `P3/SUBMISSION_PLAN.md` — 8/20~9/6 **18회**,
-1기 3회를 판정기 교정에 쓴다. 1기 제출물 3개는 게이트 통과 상태로 확보돼 있다.
+**3차 세션 갱신.** 제출 예산·일일 제한은 **`RULES.md` §0 참조**.
+사용량은 public ledger로 확인하며, 현행 제출은 여전히 T1F(W_old).
+
+public ledger 4점 — t1f `0.587165` / lgbm_only `0.591543` / damped_only `0.642689` /
+t1f_shift(+0.05) `0.592805`. 여기서 나온 것:
+
+- `f.lb_picks_dense_judge` — **조밀 재가중 판정기가 옳다.** LB lgbm < damped 로 조밀과 같은 부호,
+  씨닝은 반대 부호였다. 앞으로 씨닝 판정기를 쓰지 마라
+- `f.damped_lgbm_line_exhausted` — 이 선 위 public MSE 는 w 의 정확한 2차식이고 3점으로 결정된다.
+  최적 w=0.2365 라도 T1F 대비 개선 0.0013 < 임계 0.003
+- `f.public_small_random_subset` — public 은 200사례 중 ~80 이하 무작위 부분집합과 모순 없다.
+  전체 test 통계로 계산한 계수를 public 에 쓰면 안 된다
+- `f.t1f_positive_bias` — **T1F 는 계통적 과대예측.** public 편향 `+0.041550`,
+  로컬 조밀 OOF `+0.035652±0.008937` (z 0.66, 독립 확인). 상수보정이 로컬 fold4 를 -0.004798 개선
+- `f.nontree_breaks_corr_wall` — 비트리 멤버 2종이 상관 0.90 벽을 처음 뚫었다
+  (wsswell 0.759 / arx 0.832). 두 축은 닫혔지만 예측 자산 4개는 풀에 남았다
+
+**다음 제출 후보**: `P3/subs/submission_p3_t1f_bias.csv` (c*=-0.041550308, 게이트 통과,
+예측 RMSE `0.585693`). 판정은 사전등록 `p3_t22_pre` 규칙(3).
+
+**신규 도구**: `python P3/src/bugcheck.py {all,train,wcurve,simplex,subset}` — 제출 전 `all` 필수.
+`train` 은 학습 파이프라인 논리 감사(시간분리·경로동일성·context_only·데이터위생·재현성).
+
+**규정**: 외부 데이터·사전학습은 원문에 언급이 없어 `r.permissive` 로 허용
+(`r.external_data_unmentioned`). 단 `r.model_submit` 재현 요건이 그 데이터에도 걸린다.
 
 **게이트 주의.** `python P3/src/check.py cv` 를 조밀 인덱스에 걸면 FAIL 이 뜨는데 **누수가 아니다**
 (`f.dense_cv_gate_na`). 씨닝 평가분할 전용 게이트다.
@@ -97,3 +122,11 @@ fold4 이후다. 최근성 가중 판정기는 `W_old` 를 강화할 뿐이라 �
 - 프로젝트 학습 프로세스는 `0`개다.
 - 연구 근거와 적용/기각 판단은 각 `P{n}/COMPETITION_RESEARCH.md` 및 `graph.json`에 기록됐다.
 - 원본 데이터는 수정하지 않았다.
+
+## 공통 운영 인프라
+
+- GitHub: `https://github.com/TaeYoungLim1901/OCEAN` (private, `main`), local/remote SHA `9fde75574ef156beabea40d19a8b7a78ae0ac1a0`.
+- daily-close trigger: 2026-08-20 이후 P1/P2/P3 실제 CSV·NPY·Public 점수 3세트를 모두 받은 뒤 `.claude/skills/ocean-daily-close/SKILL.md`의 `ocean-daily-close` skill을 한 번 호출한다.
+- 필수 입력: P1/P2/P3 실제 CSV·NPY·Public 점수 3세트.
+- 8/20 전 P1/P2/P3 추가 실험 없음.
+- allowlist 밖 미추적 20개는 보존한다.

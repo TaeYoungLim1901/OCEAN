@@ -157,7 +157,7 @@
       "t": "stream 별 target 양성률(4.1% 주입 사전)로 threshold 를 앵커링해 test 과소예측 교정",
       "src": "T9 B3",
       "status": "closed",
-      "evidence": "T9 B3: inner 최고 0.689435 (r .030 lambda .50) < 전역 threshold 0.697836. lambda=1.0 은 0.423717~0.599093 로 붕괴. r 8종 x lambda 4종 전부 패배"
+      "evidence": "역방향으로 재확정: train 주입률 4.1362% 에 맞추는 것이 최악이다 (4.1808% public 0.698524). 최적은 그보다 훨씬 낮다 (2.9832% public 0.741274)"
     },
     {
       "id": "f.score_path_mismatch",
@@ -176,6 +176,173 @@
       "type": "fact",
       "t": "확장 격자(hole 24~400, threshold 0.30~0.96, weight 0~0.60)에서 inner 최적은 weight 0.00 / threshold 0.62 / hole 48, inner F1 0.697836. hole·threshold 모두 내부 최고점. rule_score 단독 inner F1 0.174346, lgbm 과 Spearman 0.055173",
       "src": "T9 A2 B1 B2"
+    },
+    {
+      "id": "f.pa_metric_mismatch",
+      "type": "fact",
+      "t": "문헌 시계열 이상탐지 F1 0.85+ 대부분은 point-adjust(Xu WWW18) 평가다. Kim AAAI22: SWaT 난수 점수도 PA-F1 0.969 인데 같은 점수 점 F1 0.216. P1 지표는 행 단위 F1 이라 PA·eTaPR·NAB 창점수 기법은 제출 점수에 이득 0. 리더보드 1위 0.858 은 진짜 행 F1",
+      "src": "grok Q1 2026-08-25"
+    },
+    {
+      "id": "f.rule_failure_modes",
+      "type": "fact",
+      "t": "규칙 점수 inner F1 0.174346 의 문헌 대응 실패모드: (1) 5유형을 한 점수로 융합 - QARTOD/Argo 는 테스트별 독립 OR (2) 온셋만 켜고 이벤트 구간을 안 채움 - offset/drift 는 변화점 이후 전 구간이 1 (3) 전역 임계 - 매뉴얼은 station 국소 (4) 점이상(spike)과 집단이상(offset/drift) 동일 점수 (5) 창이 gap 을 넘음. Spearman 0.055173 = 순위 무관",
+      "src": "grok Q1 2026-08-25"
+    },
+    {
+      "id": "a.segment_morphology",
+      "type": "axis",
+      "t": "예측 이진 벡터의 형태 연산 - dilation k(경계 확장)와 min-length L(짧은 런 삭제). hole=48 closing 은 이미 내부 최적이나 dilation·opening 은 미탐색. 봉인 fold3 FP 여유 704 대 FN 1831",
+      "src": "grok Q1 2026-08-25",
+      "status": "closed",
+      "evidence": "T14 inner fold1·2: exp008 F1=0.700380 Δ=+0.002544 (t=.82,h=96,k=1,L=12); exp009 F1=0.702442 Δ=+0.004606 (t_high=.88,t_low=.01,h=48,k=0,L=0); 3720/1170 candidates; check.sub·audit OK; exp008/009 SHA distinct from exp005"
+    },
+    {
+      "id": "f.inner_is_anchor",
+      "type": "fact",
+      "t": "public 0.717435 기준 |inner 0.697836 - public| = 0.0196, |봉인 fold3 0.815757 - public| = 0.0983. inner 가 정직한 앵커이며 fold3 는 쉬운 접힘이다 (Cawley JMLR2010 winner curse, Varma 2006). 로컬 목표는 inner 를 올리는 것. 1위 0.858 과의 실제 격차는 +0.141",
+      "src": "public LB 2026-08-25 + grok Q1"
+    },
+    {
+      "id": "f.exp006_fn_decomp",
+      "type": "fact",
+      "t": "exp005 FN 유형 분해: inner F1 0.697836, sealed outer F1 0.815757; B1-B6 JSON 산출",
+      "src": "P1/specs/T10-fn-type-decomposition.md; P1/experiments/exp006_fn_decomp.json"
+    },
+    {
+      "id": "f.fn_type_decomp",
+      "type": "fact",
+      "t": "T10 exp006 inner FN 6038 분해: offset 2156 (recall 0.4254, n 3752) + drift 1689 (recall 0.5104, n 3450) = 3845 = 전체 FN 의 63.7 퍼센트. noise 1731 (0.7004), flatline 242 (0.8942), spike 16 (0.6863). 봉인 fold3 도 동형 (offset 0.7193 drift 0.6805 flatline 0.9860)",
+      "src": "P1/experiments/exp006_fn_decomp.json"
+    },
+    {
+      "id": "f.offset_drift_shape",
+      "type": "fact",
+      "t": "세그먼트 형태 (inner): offset 17구간 중 full_miss 8, hit_ratio p50 0.0083 = 사실상 전부 놓치거나 전부 잡음. drift 12구간 중 full_miss 3, 구간내 10분위 recall 이 0.2393 에서 0.7361 로 단조 증가 = 기울기가 누적된 뒤에야 보인다. flatline 은 full_miss 0 hit p50 0.9804 로 이미 해결됨. 조합 유형(drift+offset 45행 noise+drift 95행 offset+drift 63행)은 recall 0.0",
+      "src": "P1/experiments/exp006_fn_decomp.json"
+    },
+    {
+      "id": "a.cusum_changepoint",
+      "type": "axis",
+      "t": "offset·drift 전용 CUSUM/누적기울기 변화점 검출기 + 변화점 이후 구간 라벨. 행 GBDT 가 계단 이후를 새 정상으로 보는 구조적 한계를 겨냥. numpy 로 구현 가능 (ruptures 불필요)",
+      "src": "T10 + grok Q1",
+      "status": "open"
+    },
+    {
+      "id": "r.submit_quota",
+      "type": "rule",
+      "t": "RULES.md §0 참조",
+      "src": "사용자 지시 2026-08-25"
+    },
+    {
+      "id": "r.deadline",
+      "type": "rule",
+      "t": "RULES.md §0 참조",
+      "src": "RULES.md 통합본 2026-08-25 충돌표"
+    },
+    {
+      "id": "r.model_submit_final",
+      "type": "rule",
+      "t": "모델(코드+학습가중치)을 제출하면 즉시 최종 제출로 확정되고 이후 예측 답안을 추가 업로드할 수 없다. 공지가 리더보드 성적 확보 후 맨 마지막에 모델 제출을 권장한다. 미제출 또는 재현 검증 실패는 최종 성적 미인정 = 사실상 실격",
+      "src": "RULES.md 5절"
+    },
+    {
+      "id": "r.external_data",
+      "type": "rule",
+      "t": "대학부 문제 풀이에 외부 데이터 사용 가능하다. 단 평가는 대회 보유 데이터로만 진행된다. 사전학습 모델 허용 범위는 명시 없음",
+      "src": "RULES.md 0절 FAQ"
+    },
+    {
+      "id": "r.scoring_weights",
+      "type": "rule",
+      "t": "예선 배점: 정량 성능 70점, 분석·방법론 타당성 20점, 창의성·독창성 10점. 대학부 세 문제를 각각 채점 후 합산. 리더보드 표시 점수는 약 36 곱하기 F1",
+      "src": "RULES.md 0절 붙임"
+    },
+    {
+      "id": "r.deadline_time",
+      "type": "rule",
+      "t": "RULES.md §0 참조",
+      "src": "sol R1 적대검토 2026-08-25"
+    },
+    {
+      "id": "r.postproc_reproducibility",
+      "type": "rule",
+      "t": "제출 답안은 학습 모델로 만든 파일이어야 하고 운영진이 제출 모델의 답안 재현을 검증한다. 후처리(임계 구간채움 형태연산 hysteresis)가 모델 산출물에 포함되는지는 원본 규정에 명시 없음. 따라서 모든 후처리를 inference 코드 안에 결정론적으로 넣어 제출 CSV 를 sha256 단위로 재현할 수 있어야 한다 (sol R1 C11 치명)",
+      "src": "sol R1 적대검토 2026-08-25"
+    },
+    {
+      "id": "f.hysteresis_gain",
+      "type": "fact",
+      "t": "hysteresis (t_high 0.88 로 열고 t_low 0.010 으로 연결 확장) 가 T10 표적 유형을 실제로 회수했다: inner offset recall 0.425373 에서 0.454957 (+0.029584), drift 0.510435 에서 0.533043 (+0.022609), spike 0.058824 대비 0.549020. 대가는 noise recall -0.050. 전체 inner F1 0.702442 (+0.004606). 양성률 4.1808 퍼센트가 train 4.1362 퍼센트에 수렴",
+      "src": "P1/experiments/exp008_009_grid.json"
+    },
+    {
+      "id": "f.minlength_kills_spike",
+      "type": "fact",
+      "t": "min-length L=12 은 짧은 1-런을 삭제해 spike recall 을 0.686275 에서 0.058824 로 붕괴시킨다 (exp008). grok Q1 이 예고한 대가. spike 는 inner 51행뿐이라 전체 F1 영향은 작지만 L 을 크게 잡을 때 확인해야 한다",
+      "src": "exp008 유형별 표"
+    },
+    {
+      "id": "f.inner_delta_no_transfer",
+      "type": "fact",
+      "t": "inner 델타가 public 으로 전이되지 않는다. exp009 hysteresis 는 inner +0.004606 인데 public -0.018911 로 **부호가 뒤집혔다** (inner 0.702442 public 0.698524 vs exp005 inner 0.697836 public 0.717435). 원인 추정: 후처리 격자 1170~3720 조합을 inner 에서 고르는데 유효 표본이 세그먼트 수준(offset 17 drift 12 noise 34)이라 winner curse. inner 는 **수준**은 맞히지만 **변화량**의 판정기가 아니다. 사전 승격선 0.702836 이 exp009 를 걸러낸 것은 옳았다",
+      "src": "public LB 2026-08-25 exp009"
+    },
+    {
+      "id": "f.higher_rate_hurts",
+      "type": "fact",
+      "t": "test 양성률을 올리면 public 이 내려간다. exp005 3.4791 퍼센트 public 0.717435, exp009 4.1808 퍼센트 public 0.698524. train 주입률 4.1362 퍼센트에 맞추는 것이 이득이 아니다. 단 exp009 는 hysteresis 와 양성률 상승이 교란돼 있어 exp006b(4.1441 퍼센트 단순 임계 인하)가 분리 실험이다",
+      "src": "public LB 2026-08-25"
+    },
+    {
+      "id": "f.rate_curve",
+      "type": "fact",
+      "t": "public F1 는 test 양성률에 대해 강한 단조 감소다. 4.1808%→0.698524, 3.4791%→0.717435, 2.9832%→0.741274. 기울기가 가속한다 (pp 당 +0.0269 그다음 +0.0481). 봉우리는 2.98% 보다 더 아래에 있다. inner 가 고른 threshold 0.62 는 크게 낮았고 public 은 0.775 이상을 선호한다. **임계는 inner 가 아니라 public 양성률 곡선으로 정한다**",
+      "src": "public LB 2026-08-25 exp005/exp009/exp010"
+    },
+    {
+      "id": "a.threshold_rate",
+      "type": "axis",
+      "t": "제출 양성률로 임계를 정하는 축",
+      "src": "exp005/009/010/011",
+      "status": "closed",
+      "evidence": "public 4점 (2.1602%->0.657820, 2.9832%->0.741274, 3.4791%->0.717435, 4.1808%->0.698524) 2차 적합 봉우리 3.0191% peak F1 0.741420. exp010 (2.9832%, 0.741274) 이 이미 최적에서 0.000146 이내. 임계만 더 조정해 얻을 수 있는 여지는 0.0002 미만이므로 슬롯을 더 쓰지 않는다"
+    },
+    {
+      "id": "f.rate_peak",
+      "type": "fact",
+      "t": "양성률-public F1 곡선의 봉우리는 약 3.0% 이고 최대 F1 약 0.7414 다. 봉우리 아래로는 급락한다 (2.16% 에서 0.657820, -0.0835). 위로는 완만하다 (3.48% 에서 0.717435, -0.0238). 비대칭이므로 exp007 등 새 모델의 임계도 3.0% 보다 살짝 위에서 잡는 것이 안전하다",
+      "src": "public LB 4점 2차 적합 2026-08-25"
+    },
+    {
+      "id": "f.exp007_dilution",
+      "type": "fact",
+      "t": "적분 feature 39개를 기존 42개에 더해 81개로 만들자 inner F1 이 0.697836 에서 0.577092 로 붕괴했다 (-0.120744). 유형별로 전부 악화 (offset 0.425373→0.288380, drift 0.510435→0.433043, noise 0.700364→0.429981). flatline 만 0.894231 로 동일. 700 tree 고정에 early stop 없는 설정에서 feature 를 두 배 가까이 늘린 것이 분할 예산을 희석시킨 것으로 보이나 원인은 미측정. **적분 feature 개념 자체가 기각된 것이 아니라 이 구현이 기각됐다**",
+      "src": "P1/experiments/logs/run_exp007.log"
+    },
+    {
+      "id": "f.dilution_confirmed",
+      "type": "fact",
+      "t": "희석 가설 확정. exp007 의 적분 feature 39개가 split 의 44.573733 퍼센트를 먹으면서 gain 은 24.500096 퍼센트만 낸다. gain 상위 20 안에 4개뿐이고 gain 0 인 feature 는 0개 - 전부 쓰이되 비효율적이다. 700 tree 고정 예산에서 분할의 절반을 저효율 feature 가 가져갔다. V1 (기존 42 + gain 상위 5) 은 exp005 와 동일한 후처리(t 0.62 hole 48)에서 inner F1 0.702859 로 exp005 0.697836 대비 +0.005023 - 적분 feature 개념은 유효하고 개수가 문제였다",
+      "src": "P1/experiments/logs/codex_T18.log D1/D2"
+    },
+    {
+      "id": "f.exp005_exp007_corr",
+      "type": "fact",
+      "t": "exp005 와 exp007 원시 확률 oof 의 Spearman 상관은 0.718054 다. 완전 중복이 아니므로 앙상블 재조합 여지가 있다. 단 preds 의 기존 배열은 uint8 이진화라 재조합에 못 쓴다 - score_oof_V1.npy 부터 float 로 저장된다",
+      "src": "T18 D3"
+    },
+    {
+      "id": "f.v1_wins",
+      "type": "fact",
+      "t": "적분 feature 개수 절벽. 후처리 exp005 고정(t 0.62 hole 48) 기준 inner F1: exp005 42개 0.697836, V1 47개(상위5) **0.702859**, V2 54개(상위12) 0.587059, V3 81개+1400tree 0.551970. 5개는 이득 12개는 붕괴다. 트리 예산 2배로도 복구 안 된다(V3 최악). 선택된 5개는 temp_step_abs_144 max_z_center_144 temp_step_144 temp_step_abs_48 psal_step_abs_144 - **전부 step 검출기 계열**로 offset 진단과 일치",
+      "src": "P1/experiments/logs/run_d2.log"
+    },
+    {
+      "id": "f.t19_quarantine",
+      "type": "fact",
+      "t": "격리: score_oof_V1.npy C4ED60F0, score_oof_V2.npy 3880AA29, score_oof_V3.npy 08B452B8; 원천 연속 raw score 부재로 quarantine 이동, ensemble/submission 경로 제외",
+      "src": "P1/specs/T19-p1-guards.md T19-3"
     }
   ],
   "edges": [
@@ -243,6 +410,11 @@
       "f.exp005_result",
       "measures",
       "g.sub"
+    ],
+    [
+      "f.exp006_fn_decomp",
+      "derives_from",
+      "f.exp005_result"
     ]
   ]
 }

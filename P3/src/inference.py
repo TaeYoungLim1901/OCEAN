@@ -8,6 +8,7 @@ import pandas as pd
 
 import cases as C
 from features import extract
+from submission_tools import save_pool_pred
 from train import predict_damped, predict_lgbm
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -31,9 +32,9 @@ def main():
     sub_dir = P3 / "subs"
     pred_dir.mkdir(exist_ok=True)
     sub_dir.mkdir(exist_ok=True)
-    np.save(pred_dir / "test_damped_p3_t1.npy", damped)
-    np.save(pred_dir / "test_lgbm_p3_t1.npy", lgbm)
-    np.save(pred_dir / "test_final_p3_t1.npy", final)
+    save_pool_pred(pred_dir / "test_damped_p3_t1.npy", damped)
+    save_pool_pred(pred_dir / "test_lgbm_p3_t1.npy", lgbm)
+    final = np.load(save_pool_pred(pred_dir / "test_final_p3_t1.npy", final), allow_pickle=False)
     values = {(cid, st, lead): float(final[i, j]) for i, (cid, st, _) in cases.iterrows()
               for j, lead in enumerate(C.LEADS)}
     index = pd.read_csv(C.DATA / "test_index.csv")

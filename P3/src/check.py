@@ -5,7 +5,15 @@
   python src/check.py cases      # 학습 컨텍스트가 test 컨텍스트와 같은 형태인가
   python src/check.py cv <fold열>  # 폴드 누출 (컨텍스트 48h + 타깃 24h + 완충)
 """
+import hashlib
+import json
+import pathlib
+import shutil
+import subprocess
 import sys
+import tempfile
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
 
@@ -18,6 +26,14 @@ FAILS, WARNS = [], []
 
 def bad(msg): FAILS.append(msg)
 def warn(msg): WARNS.append(msg)
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest().upper()
 
 
 def verdict():
@@ -132,6 +148,71 @@ def c_cv(fold_csv):
     return verdict()
 
 
+def c_hashes():
+    record = C.P3 / "cache" / "data_sha256.json"
+    files = sorted(p for p in C.DATA.iterdir() if p.is_file())
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps({p.name: file_sha256(p) for p in files},
+                                 ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"  data_files={len(files)} recorded={len(files)} path={record}")
+    return verdict()
+
+
+def c_final(csv_path):
+    csv_path = pathlib.Path(csv_path).resolve()
+    runner = {"submission_p3_t1f": ("inference_t1f.py", "test_final_p3_t1f.npy")}.get(csv_path.stem)
+    try:
+        if runner is None:
+            raise ValueError(f"unsupported submission runner: {csv_path.stem}")
+        if not csv_path.is_file():
+            raise FileNotFoundError(csv_path)
+        code_names = ["cases.py", "features.py", "metric.py", "submission_tools.py",
+                      "train.py", runner[0]]
+        weight = C.P3 / "models" / "p3_t1" / "bundle.pkl"
+        if not weight.is_file():
+            raise FileNotFoundError(weight)
+        with tempfile.TemporaryDirectory(prefix="p3_final_") as td:
+            isolated = pathlib.Path(td) / "P3"
+            for part in ("src", "models/p3_t1", "P3_data", "preds", "subs"):
+                (isolated / part).mkdir(parents=True, exist_ok=True)
+            for name in code_names:
+                shutil.copy2(C.P3 / "src" / name, isolated / "src" / name)
+            for name in ("test_context.parquet", "test_index.csv"):
+                shutil.copy2(C.DATA / name, isolated / "P3_data" / name)
+            shutil.copy2(weight, isolated / "models" / "p3_t1" / "bundle.pkl")
+            proc = subprocess.run([sys.executable, str(isolated / "src" / runner[0])],
+                                  cwd=isolated, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace")
+            if proc.returncode:
+                raise RuntimeError((proc.stdout + proc.stderr).strip())
+            if (isolated / "cache").exists():
+                raise RuntimeError("isolated inference read or created cache")
+            generated_csv = isolated / "subs" / csv_path.name
+            generated_pred = isolated / "preds" / runner[1]
+            if file_sha256(generated_csv) != file_sha256(csv_path):
+                raise ValueError("reproduced CSV sha256 mismatch")
+            if not generated_pred.is_file():
+                raise FileNotFoundError(generated_pred)
+            golden_pred = C.P3 / "preds" / runner[1]
+            if generated_pred.read_bytes() != golden_pred.read_bytes():
+                raise ValueError("reproduced NPY bytes mismatch")
+            if np.load(generated_pred, allow_pickle=False).dtype != np.load(golden_pred, allow_pickle=False).dtype:
+                raise ValueError("reproduced NPY dtype mismatch")
+        code_files = {f"P3/src/{name}": file_sha256(C.P3 / "src" / name) for name in code_names}
+        manifest = {"csv": f"P3/subs/{csv_path.name}", "csv_sha256": file_sha256(csv_path),
+                    "pred_npy": f"P3/preds/{runner[1]}",
+                    "pred_sha256": file_sha256(C.P3 / "preds" / runner[1]),
+                    "code_files": code_files,
+                    "weights": {"P3/models/p3_t1/bundle.pkl": file_sha256(weight)},
+                    "seed": 42, "created": datetime.now(timezone.utc).isoformat()}
+        manifest_path = csv_path.with_suffix(".manifest.json")
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"final csv_sha256={manifest['csv_sha256']} pred_sha256={manifest['pred_sha256']} code_files={len(code_files)} weights=1")
+    except Exception as exc:
+        bad(f"final {type(exc).__name__}: {exc}")
+    return verdict()
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -140,4 +221,8 @@ if __name__ == "__main__":
         sys.exit(fn())
     if cmd == "cv":
         sys.exit(c_cv(sys.argv[2]))
+    if cmd == "hashes":
+        sys.exit(c_hashes())
+    if cmd == "final":
+        sys.exit(c_final(sys.argv[2]))
     sys.exit(__doc__)

@@ -17,6 +17,7 @@ from sklearn.preprocessing import StandardScaler
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 from train import estimator
+from submission_tools import save_pool_pred
 
 HOLDS = {
     "2024_julaug": ("2024-07-02", "2024-08-31 23:50", True),
@@ -299,8 +300,8 @@ def main():
     all_index = pd.concat(index_parts, ignore_index=True)
     all_index.to_csv(C.ROOT / "cache" / "E003" / "oof_index.csv", index=False)
     for name in ["e002", "no_depth", *candidates]:
-        np.save(C.ROOT / "preds" / f"oof_{name}_E003.npy",
-                np.concatenate([hold_preds[h][name] for h in HOLDS]))
+        save_pool_pred(C.ROOT / "preds" / f"oof_{name}_E003.npy",
+                       np.concatenate([hold_preds[h][name] for h in HOLDS]))
     truth_all = all_index.temp.to_numpy()
     correlations = {}
     for i, a in enumerate(["e002", "enhanced", "eof", "robust_blend", "regime_gate"]):

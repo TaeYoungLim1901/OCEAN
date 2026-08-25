@@ -10,6 +10,7 @@ import pandas as pd
 
 import cases as C
 from features_t2 import extract, feature_names
+from submission_tools import save_pool_pred
 from train_t2 import CANDIDATES, combine, predict_models
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -34,9 +35,9 @@ def main():
     x = np.stack(feats)
     preds = predict_models(bundle["models"], x, cases)
     for name in CANDIDATES:
-        np.save(P3 / "preds" / f"test_{name}_p3_t2.npy", preds[name])
+        save_pool_pred(P3 / "preds" / f"test_{name}_p3_t2.npy", preds[name])
     final = combine(preds, bundle["selection"])
-    np.save(P3 / "preds" / "test_final_p3_t2.npy", final)
+    final = np.load(save_pool_pred(P3 / "preds" / "test_final_p3_t2.npy", final), allow_pickle=False)
     info = {"accepted": bool(bundle["accepted"]), "selection": bundle["selection"],
             "test_pred_sha256": sha256(P3 / "preds" / "test_final_p3_t2.npy")}
     if bundle["accepted"]:

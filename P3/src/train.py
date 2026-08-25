@@ -168,9 +168,9 @@ def main():
     accepted = best[1] > 0 and rmse(y_valid, oof_d[valid]) - best[0] >= 0.003
     weight = best[1] if accepted else 0.0
     final = (1 - weight) * oof_d + weight * oof_l
-    np.save(PREDS / "oof_damped_p3_t1.npy", oof_d)
-    np.save(PREDS / "oof_lgbm_p3_t1.npy", oof_l)
-    np.save(PREDS / "oof_final_p3_t1.npy", final)
+    np.save(CACHE / "oof_damped_p3_t1.npy", oof_d)
+    np.save(CACHE / "oof_lgbm_p3_t1.npy", oof_l)
+    np.save(CACHE / "oof_final_p3_t1.npy", final)
     save_local_csv(ev, final)
     full_d = fit_damped(cases)
     full_l = fit_lgbm(x, cases)

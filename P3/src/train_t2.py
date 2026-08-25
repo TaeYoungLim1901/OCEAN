@@ -382,7 +382,7 @@ def main(argv=None):
     old_cases = pd.read_parquet(P3 / "cache" / "p3_t1" / "oof_cases.parquet")
     if not np.array_equal(old_cases.case_id.to_numpy(), ev.case_id.to_numpy()):
         raise RuntimeError("T1F OOF case alignment mismatch")
-    t1f = np.load(PREDS / "oof_final_p3_t1f.npy")
+    t1f = np.load(P3 / "cache" / "p3_t1" / "oof_final_p3_t1f.npy")
     outer_cases = ev.loc[outer_mask].reset_index(drop=True)
     outer_regime = regimes[outer_mask]
     seg_new = segment_scores(outer_cases, y[outer_mask], selected_oof[outer_mask], outer_regime)
@@ -390,8 +390,8 @@ def main(argv=None):
     degradation = {k: seg_new[k] - seg_t1f[k] for k in seg_new.keys() & seg_t1f.keys()}
     outer_new, outer_t1f = rmse(y[outer_mask], selected_oof[outer_mask]), rmse(y[outer_mask], t1f[outer_mask])
     accepted = outer_new <= T1F_OUTER - 0.002 and max(degradation.values()) <= 0.03
-    for name in CANDIDATES: np.save(PREDS / f"oof_{name}_p3_t2.npy", oof[name])
-    np.save(PREDS / "oof_final_p3_t2.npy", selected_oof)
+    for name in CANDIDATES: np.save(CACHE / f"oof_{name}_p3_t2.npy", oof[name])
+    np.save(CACHE / "oof_final_p3_t2.npy", selected_oof)
     residual_corr = {n: float(np.corrcoef((y[selection_mask] - oof[n][selection_mask]).ravel(),
                                          (y[selection_mask] - selected_oof[selection_mask]).ravel())[0, 1])
                      for n in CANDIDATES}

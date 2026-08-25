@@ -27,7 +27,25 @@ def digest(path):
     return h.hexdigest().upper()
 
 
-def audit(path, pred=None, canonical=None, baseline=None, log_path=AUDITS, use_check=True):
+def save_pool_pred(path, values):
+    """Write one-dimensional continuous pool scores, never binary labels."""
+    values = np.asarray(values)
+    if (values.ndim != 1 or not np.issubdtype(values.dtype, np.floating)
+            or not np.isfinite(values).all()
+            or np.any((values < 0) | (values > 1))
+            or np.unique(values).size < 3):
+        raise ValueError("pool prediction must be finite floating scores in [0,1] with >=3 unique values")
+    stored = values.astype(np.float32)
+    if np.unique(stored).size < 3:
+        raise ValueError("pool prediction loses score resolution in float32")
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, stored)
+
+
+def audit(path, pred, canonical=None, baseline=None, log_path=AUDITS, use_check=True):
+    if pred is None:
+        raise ValueError("--pred is required")
     path = Path(path)
     canonical = Path(canonical or C.DATA / "sample_submission.csv")
     baseline = Path(baseline or C.DATA / "baseline_rule.csv")
@@ -59,12 +77,11 @@ def audit(path, pred=None, canonical=None, baseline=None, log_path=AUDITS, use_c
             by = pd.to_numeric(base.label, errors="coerce").to_numpy()
             mismatch = int((y.to_numpy() != by).sum())
             pos_delta = int(y.sum() - by.sum())
-        if pred:
-            p = np.load(pred)
-            if p.shape != (len(sub),) or not np.isfinite(p).all():
-                fails.append(f"pred shape/유한 오류 {p.shape}")
-            elif not np.array_equal((p >= 0.5).astype(int), y.astype(int).to_numpy()):
-                fails.append(f"pred→label 불일치 {int(((p >= 0.5).astype(int) != y.astype(int).to_numpy()).sum()):,}")
+        p = np.load(pred, allow_pickle=False)
+        if p.shape != (len(sub),) or not np.isfinite(p).all():
+            fails.append(f"pred shape/유한 오류 {p.shape}")
+        elif not np.array_equal((p >= 0.5).astype(int), y.astype(int).to_numpy()):
+            fails.append(f"pred→label 불일치 {int(((p >= 0.5).astype(int) != y.astype(int).to_numpy()).sum()):,}")
     except Exception as e:
         fails.append(f"읽기/검증 오류: {e}")
         sub, y, mismatch, pos_delta = pd.DataFrame(), pd.Series(dtype=float), None, None
@@ -80,7 +97,7 @@ def audit(path, pred=None, canonical=None, baseline=None, log_path=AUDITS, use_c
         "audited_at": datetime.now().astimezone().isoformat(), "rows": len(sub),
         "positive": int(y.sum()), "positive_rate": float(y.mean()),
         "baseline_mismatch": mismatch, "baseline_mismatch_rate": mismatch / len(sub),
-        "baseline_positive_delta": pos_delta, "pred": str(Path(pred).resolve()) if pred else "",
+        "baseline_positive_delta": pos_delta, "pred": str(Path(pred).resolve()),
     }
     existing = []
     if Path(log_path).exists():
@@ -133,12 +150,17 @@ def public_list(ledger=SCORES):
 def selftest():
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
-        keys = pd.DataFrame({"station": ["S"] * 2, "year": [2026] * 2, "layer": [1] * 2, "time": ["t1", "t2"]})
+        keys = pd.DataFrame({"station": ["S"] * 3, "year": [2026] * 3, "layer": [1] * 3, "time": ["t1", "t2", "t3"]})
         canon = keys.assign(label=0, anomaly_type="")
         base = canon.copy()
-        good = keys.assign(label=[0, 1])
+        good = keys.assign(label=[0, 1, 0])
         canon.to_csv(td / "canon.csv", index=False); base.to_csv(td / "base.csv", index=False); good.to_csv(td / "good.csv", index=False)
-        np.save(td / "pred.npy", np.array([0.1, 0.9]))
+        save_pool_pred(td / "pred.npy", np.array([0.1, 0.9, 0.3]))
+        try:
+            save_pool_pred(td / "rejected.npy", np.array([0, 1], dtype=np.uint8))
+            raise AssertionError("binary writer input was accepted")
+        except ValueError:
+            assert not (td / "rejected.npy").exists()
         kw = dict(canonical=td / "canon.csv", baseline=td / "base.csv", log_path=td / "audit.jsonl", use_check=False)
         assert audit(td / "good.csv", td / "pred.npy", **kw)[0] == 0
         assert audit(td / "good.csv", td / "pred.npy", **kw)[0] == 0
@@ -146,9 +168,9 @@ def selftest():
         np.save(td / "wrong.npy", np.array([0.9, 0.1]))
         assert audit(td / "good.csv", td / "wrong.npy", **kw)[0] == 1
         bad = good.iloc[::-1]; bad.to_csv(td / "bad.csv", index=False)
-        assert audit(td / "bad.csv", **kw)[0] == 1
-        assert public_add(td / "good.csv", 0.6, ledger=td / "scores.csv", **kw) == 0
-        assert public_add(td / "good.csv", 0.7, note="updated", ledger=td / "scores.csv", **kw) == 0
+        assert audit(td / "bad.csv", td / "pred.npy", **kw)[0] == 1
+        assert public_add(td / "good.csv", 0.6, pred=td / "pred.npy", ledger=td / "scores.csv", **kw) == 0
+        assert public_add(td / "good.csv", 0.7, pred=td / "pred.npy", note="updated", ledger=td / "scores.csv", **kw) == 0
         saved = pd.read_csv(td / "scores.csv")
         assert len(saved) == 1 and saved.public.iloc[0] == 0.7
     print("selftest 판정: OK")
@@ -158,14 +180,14 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    a = sub.add_parser("audit"); a.add_argument("csv"); a.add_argument("--pred")
+    a = sub.add_parser("audit"); a.add_argument("csv"); a.add_argument("--pred", required=True)
     p = sub.add_parser("public"); ps = p.add_subparsers(dest="public_cmd", required=True)
-    a = ps.add_parser("add"); a.add_argument("csv"); a.add_argument("score", type=float); a.add_argument("--local", type=float); a.add_argument("--note", default="")
+    a = ps.add_parser("add"); a.add_argument("csv"); a.add_argument("score", type=float); a.add_argument("--pred", required=True); a.add_argument("--local", type=float); a.add_argument("--note", default="")
     ps.add_parser("list"); sub.add_parser("selftest")
     args = ap.parse_args()
     if args.cmd == "audit": return audit(args.csv, args.pred)[0]
     if args.cmd == "selftest": return selftest()
-    if args.public_cmd == "add": return public_add(args.csv, args.score, args.local, args.note)
+    if args.public_cmd == "add": return public_add(args.csv, args.score, args.local, args.note, pred=args.pred)
     return public_list()
 
 

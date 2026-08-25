@@ -1,6 +1,11 @@
-"""P2 사전 게이트: data | pipeline | cases | sub <csv>."""
+"""P2 사전 게이트: data | pipeline | cases | sub <csv> | hashes | final <csv>."""
 import hashlib
+import json
+import shutil
+import subprocess
 import sys
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -85,6 +90,71 @@ def sub(path):
     return verdict(fails)
 
 
+def hashes():
+    record = C.ROOT / "cache" / "data_sha256.json"
+    payload = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in sorted(C.DATA.glob("*.csv"))}
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(f"  recorded={len(payload):,} path={record}")
+    return verdict([])
+
+
+def _relative(path):
+    return Path(path).resolve().relative_to(C.ROOT.parent.resolve()).as_posix()
+
+
+def _sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest().upper()
+
+
+def final(path):
+    csv_path = Path(path).resolve()
+    model_path = C.ROOT / "models" / "E002.pkl"
+    code_paths = [C.ROOT / "src" / name for name in
+                  ("check.py", "common.py", "inference_e002.py", "submission_tools.py")]
+    if not csv_path.exists() or not model_path.exists() or any(not p.exists() for p in code_paths):
+        return verdict(["final 입력/코드/가중치 누락"])
+    pred_path = C.ROOT / "preds" / "test_fixed_depth_E002.npy"
+    with tempfile.TemporaryDirectory(prefix="p2_final_") as td_name:
+        isolated = Path(td_name) / "P2"
+        (isolated / "src").mkdir(parents=True)
+        (isolated / "models").mkdir()
+        (isolated / "preds").mkdir()
+        (isolated / "subs").mkdir()
+        shutil.copytree(C.DATA, isolated / "P2_data")
+        for source in code_paths:
+            shutil.copy2(source, isolated / "src" / source.name)
+        shutil.copy2(model_path, isolated / "models" / model_path.name)
+        run = subprocess.run(
+            [sys.executable, str(isolated / "src" / "inference_e002.py")],
+            cwd=isolated, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+        reproduced = isolated / "subs" / csv_path.name
+        generated_pred = isolated / "preds" / pred_path.name
+        if run.returncode or not reproduced.exists() or not generated_pred.exists():
+            return verdict([f"final inference failed rc={run.returncode}: {(run.stdout + run.stderr).strip()[-240:]}"])
+        expected, got = _sha256(csv_path), _sha256(reproduced)
+        pred_match = generated_pred.read_bytes() == pred_path.read_bytes()
+        print(f"  csv_sha256={got} expected={expected} match={got == expected} pred_bytes_match={pred_match}")
+        if got != expected or not pred_match:
+            return verdict(["final 재현 CSV/NPY 불일치"])
+        manifest = {
+            "csv": _relative(csv_path),
+            "csv_sha256": expected,
+            "pred_npy": _relative(pred_path),
+            "pred_sha256": _sha256(pred_path),
+            "code_files": {_relative(p): _sha256(p) for p in code_paths},
+            "weights": {_relative(model_path): _sha256(model_path)},
+            "seed": C.SEED,
+            "created": datetime.now(timezone.utc).isoformat(),
+        }
+    manifest_path = csv_path.with_name(csv_path.stem + ".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"  manifest={_relative(manifest_path)}")
+    return verdict([])
+
+
 def reproduce():
     from inference_e002 import calculate
     pred, sub, artifact = calculate()
@@ -100,8 +170,10 @@ def reproduce():
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd in {"data", "pipeline", "cases", "reproduce"}:
+    if cmd in {"data", "pipeline", "cases", "reproduce", "hashes"}:
         raise SystemExit(globals()[cmd]())
     if cmd == "sub" and len(sys.argv) == 3:
         raise SystemExit(sub(sys.argv[2]))
+    if cmd == "final" and len(sys.argv) == 3:
+        raise SystemExit(final(sys.argv[2]))
     raise SystemExit(__doc__)

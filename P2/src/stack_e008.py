@@ -10,6 +10,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 import gate_e004 as G
+from submission_tools import save_pool_pred
 
 SEED = 42
 ROOT = Path(__file__).resolve().parents[1]
@@ -287,10 +288,10 @@ def main():
     if len(baseline_oof) != oof_n or len(baseline_test) != test_n:
         raise ValueError("E004 baseline 길이 불일치")
     candidates, weights = _stack(names, x_oof, x_test, y, hold_labels, flags, test_flags)
-    np.save(ROOT / "preds" / "oof_stack_global_E008.npy", candidates["stack_global"][0])
-    np.save(ROOT / "preds" / "test_stack_global_E008.npy", candidates["stack_global"][1])
-    np.save(ROOT / "preds" / "oof_stack_regime_E008.npy", candidates["stack_regime"][0])
-    np.save(ROOT / "preds" / "test_stack_regime_E008.npy", candidates["stack_regime"][1])
+    save_pool_pred(ROOT / "preds" / "oof_stack_global_E008.npy", candidates["stack_global"][0])
+    save_pool_pred(ROOT / "preds" / "test_stack_global_E008.npy", candidates["stack_global"][1])
+    save_pool_pred(ROOT / "preds" / "oof_stack_regime_E008.npy", candidates["stack_regime"][0])
+    save_pool_pred(ROOT / "preds" / "test_stack_regime_E008.npy", candidates["stack_regime"][1])
 
     reports = {hold: {"e004": None, "stack_global": None, "stack_regime": None} for hold in HOLDS}
     offset = 0

@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from features import make_features
 from metric import evaluate, f1
+from submission_tools import save_pool_pred
 from train import fill_short_gaps, segment_ids
 
 SEED = 42
@@ -242,8 +243,8 @@ def train_main():
     fit_final(xfull, y, yt, iterations)
     xte, _ = make_features(test, {"median": ref_full["median"], "mad": ref_full["mad"]})
 
-    np.save(ROOT / "preds/oof_binary_exp003.npy", oof_b.astype(np.float32))
-    np.save(ROOT / "preds/oof_multiclass_exp003.npy", oof_m.astype(np.float32))
+    save_pool_pred(ROOT / "preds/oof_binary_exp003.npy", oof_b)
+    save_pool_pred(ROOT / "preds/oof_multiclass_exp003.npy", oof_m)
 
     drift = adversarial_drift(train, test, xfull, xte)
     by_type = evaluate(train.loc[outer].assign(anomaly_type=train.loc[outer].anomaly_type.fillna("normal")), pred[outer], ["anomaly_type"])
@@ -255,7 +256,7 @@ def train_main():
     promote = outer_stats[0] > BASE_OUTER or (inner_f1 > BASE_INNER and residual_corr < 0.98 and outer_stats[0] >= BASE_OUTER - 0.002)
     if promote:
         oof_store = store_score(combined - threshold + 0.5, pred)
-        np.save(ROOT / "preds/oof_exp003.npy", oof_store)
+        save_pool_pred(ROOT / "preds/oof_exp003.npy", oof_store)
 
     pool = {
         "outer_pearson_exp002_exp003": pearson,
@@ -338,12 +339,12 @@ def reseal_saved():
         x.loc[outer], num_iteration=iterations["multiclass"]
     )
     oof_m[outer] = 1.0 - pm[:, 0]
-    np.save(ROOT / "preds/oof_binary_exp003.npy", oof_b.astype(np.float32))
-    np.save(ROOT / "preds/oof_multiclass_exp003.npy", oof_m.astype(np.float32))
+    save_pool_pred(ROOT / "preds/oof_binary_exp003.npy", oof_b)
+    save_pool_pred(ROOT / "preds/oof_multiclass_exp003.npy", oof_m)
     score = (1 - meta["multi_weight"]) * oof_b + meta["multi_weight"] * oof_m
     pred = fill_short_gaps(score >= meta["threshold"], train, meta["hole"])
     stats = f1(y[outer], pred[outer])
-    np.save(ROOT / "preds/oof_exp003.npy", store_score(score - meta["threshold"] + 0.5, pred))
+    save_pool_pred(ROOT / "preds/oof_exp003.npy", store_score(score - meta["threshold"] + 0.5, pred))
     evaluate(train.loc[outer].assign(anomaly_type=train.loc[outer].anomaly_type.fillna("normal")), pred[outer], ["anomaly_type"]).to_csv(
         ROOT / "experiments/exp003_outer_by_type.csv", index=False
     )

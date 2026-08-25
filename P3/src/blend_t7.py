@@ -9,12 +9,19 @@ import pandas as pd
 
 import cases as C
 import metric as M
+from submission_tools import save_pool_pred
 
 sys.stdout.reconfigure(encoding="utf-8")
 
 P3 = pathlib.Path(__file__).resolve().parent.parent
 PREDS = P3 / "preds"
 CACHE = P3 / "cache" / "p3_t7"
+OOF_PATHS = {
+    "oof_damped_p3_t1.npy": P3 / "cache" / "p3_t1" / "oof_damped_p3_t1.npy",
+    "oof_lgbm_p3_t1.npy": P3 / "cache" / "p3_t1" / "oof_lgbm_p3_t1.npy",
+    "oof_eqrelax_p3_t6.npy": P3 / "cache" / "p3_t6" / "oof_eqrelax_p3_t6.npy",
+    "oof_final_p3_t1f.npy": P3 / "cache" / "p3_t1" / "oof_final_p3_t1f.npy",
+}
 LEADS = C.LEADS
 N_CANDIDATES = 4
 T1F_VIEW_A = 0.761125519778535
@@ -32,7 +39,7 @@ VARIANT_GROUPS = {
 
 
 def load(name):
-    path = PREDS / name
+    path = OOF_PATHS.get(name, PREDS / name)
     if not path.exists():
         raise FileNotFoundError(path)
     return np.load(path, allow_pickle=False)
@@ -148,6 +155,7 @@ def delta_segments(candidate, baseline):
 
 
 def main():
+    CACHE.mkdir(parents=True, exist_ok=True)
     required = [
         "oof_damped_p3_t1.npy", "test_damped_p3_t1.npy",
         "oof_lgbm_p3_t1.npy", "test_lgbm_p3_t1.npy",
@@ -176,7 +184,7 @@ def main():
     if not np.isfinite(oof[:, valid, :]).all() or not np.isfinite(t1f[valid]).all():
         raise AssertionError("non-finite valid OOF prediction")
 
-    np.save(PREDS / "oof_persistence_p3_t7.npy", oof[0])
+    save_pool_pred(PREDS / "oof_persistence_p3_t7.npy", oof[0])
     test_rows = list(C.iter_test_contexts())
     test_cases = pd.DataFrame(
         [(cid, station, float(context[-1, 0])) for cid, station, context in test_rows],
@@ -194,7 +202,7 @@ def main():
     ])
     if not np.isfinite(test).all() or test.shape[1:] != (len(test_cases), len(LEADS)):
         raise AssertionError("unexpected test prediction shape")
-    np.save(PREDS / "test_persistence_p3_t7.npy", test[0])
+    save_pool_pred(PREDS / "test_persistence_p3_t7.npy", test[0])
 
     baseline_a = view(cases, y, t1f, valid)
     baseline_4 = view(cases, y, t1f, fold4)
@@ -283,7 +291,7 @@ def main():
                                    for name, info in chosen["groups"].items()
                                    if not info["fallback_global"]})
         test_pred = np.clip(test_pred, 0, 30)
-        np.save(PREDS / "oof_final_p3_t7.npy", apply_weights(
+        np.save(CACHE / "oof_final_p3_t7.npy", apply_weights(
             oof, groups,
             np.array([chosen["global_weight"][name] for name in
                       ["persistence", "damped", "lgbm_t1", "eqrelax"]]),
@@ -291,7 +299,7 @@ def main():
                              ["persistence", "damped", "lgbm_t1", "eqrelax"]])
              for name, info in chosen["groups"].items() if not info["fallback_global"]},
         ))
-        np.save(PREDS / "test_final_p3_t7.npy", test_pred)
+        test_pred = np.load(save_pool_pred(PREDS / "test_final_p3_t7.npy", test_pred), allow_pickle=False)
         sub = index.copy()
         sub["hs_pred"] = test_pred.reshape(-1)
         sub_path = P3 / "subs" / "submission_p3_t7.csv"

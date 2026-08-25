@@ -49,11 +49,12 @@ python P3/src/check.py data       # 원본 무결성 · test 스키마
 python P3/src/check.py pipeline   # 지속성 재현이 baseline_persistence.csv 와 완전일치 (정답 없이 생산경로 검증)
 python P3/src/check.py cases      # 학습 컨텍스트 == test 컨텍스트 형태, 사례 선정 분포 대조
 python P3/src/check.py cv <fold.csv>  # 폴드 생성 후 정점별 경계의 78h 간격 검사
+python P3/src/check.py hashes    # 원본 P3_data 8개 SHA256 대장 생성
 python P3/src/metric.py selftest  # 완벽예측 0, 행 가법성, 키 불일치 탐지
-python P3/src/submission_tools.py audit <csv> [--pred <npy>]  # 모든 제출 직전 필수
+python P3/src/submission_tools.py audit <csv> --pred <npy>  # 모든 제출 직전 필수
 ```
 
-Public 점수는 `python P3/src/submission_tools.py public add <csv> <RMSE>`로 기록하고 `python P3/src/submission_tools.py public list`로 본다.
+Public 점수는 `python P3/src/submission_tools.py public add <csv> <RMSE> --pred <npy>`로 기록하고 `python P3/src/submission_tools.py public list`로 본다.
 숨은 정답 없이는 Public RMSE를 계산할 수 없으므로 리더보드에서 받은 값만 기록한다.
 
 `cv` 게이트는 fold 간 시간 간격만 본다. 달력 피처와 t0 이후 입력 혼입은 사양·코드에서 별도 확인한다.

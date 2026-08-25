@@ -3,7 +3,7 @@
     "problem": "P2",
     "title": "소청초 기지 중간층 수온 연직 구조 복원",
     "metric": "통합 RMSE(degC), 26061행",
-    "updated": "2026-08-13",
+    "updated": "2026-08-25",
     "id_prefix": {
       "r.": "rule",
       "f.": "fact",
@@ -180,15 +180,15 @@
       "id": "a.mask_augment",
       "type": "axis",
       "t": "학습 입력에 test 연속 결측 패턴을 주입해 공개층 결측 regime 전용 경로를 학습",
-      "status": "closed",
-      "evidence": "E005: 4-hold 균등규칙 기각. maskaug 평균 +0.004738, missing_public 2/4만 개선(2024_sepoct -0.134542, 2025_julaug -0.075698 / 2024_julaug +0.066920, 2025_mayjun +0.057907). 계절 정합 재판정(a.season_matched_holdout)은 미완"
+      "status": "open",
+      "evidence": "E005: 4-hold 균등규칙 기각. maskaug 평균 +0.004738, missing_public 2/4만 개선(2024_sepoct -0.134542, 2025_julaug -0.075698 / 2024_julaug +0.066920, 2025_mayjun +0.057907). 계절 정합 재판정(a.season_matched_holdout)은 미완 || 2026-08-25 재개: public E009 Δ-0.011340. 로컬 4-hold 균등 기각 근거 무효"
     },
     {
       "id": "a.season_matched_holdout",
       "type": "axis",
       "t": "test 와 같은 Sep-Oct 계절 창으로만 결측 regime 모델을 판정",
-      "status": "closed",
-      "evidence": "E006: 계절 정합 창 4개에서 maskaug 결측행 3/4 개선(S1 -0.187817, S3 -0.126989, S4 -0.059486) 평균 -0.052651이나 S2(2024-08-16~10-15) missing +0.163685·전체 +0.045741로 R3·R4 위반 기각. 8월 비중 큰 창에서만 진다"
+      "status": "open",
+      "evidence": "E006: 계절 정합 창 4개에서 maskaug 결측행 3/4 개선(S1 -0.187817, S3 -0.126989, S4 -0.059486) 평균 -0.052651이나 S2(2024-08-16~10-15) missing +0.163685·전체 +0.045741로 R3·R4 위반 기각. 8월 비중 큰 창에서만 진다 || 2026-08-25 재개: public E009 Δ-0.011340. 로컬 4-hold 균등 기각 근거 무효"
     },
     {
       "id": "g.e006",
@@ -210,7 +210,92 @@
       "type": "axis",
       "t": "저장된 OOF 풀 전체에 비음수 합1 가중을 LOHO 로 추정",
       "status": "closed",
-      "evidence": "E008: LOHO 판정에서 stack_global 1.110727(+0.021660), stack_regime 1.093994(+0.004927) 모두 E004 1.089067 대비 악화. hold 간 가중이 전이되지 않음(adversarial AUC 0.99 와 정합). 재학습 없이 풀 재조합만으로는 이득 없음"
+      "evidence": "E008: LOHO 판정에서 stack_global 1.110727(+0.021660), stack_regime 1.093994(+0.004927) 모두 E004 1.089067 대비 악화. hold 간 가중이 전이되지 않음(adversarial AUC 0.99 와 정합). 재학습 없이 풀 재조합만으로는 이득 없음 || 2026-08-25 재개: public E009 Δ-0.011340. 로컬 4-hold 균등 기각 근거 무효",
+      "ev": " || 2026-08-25 재종료: public E010 완전행 stack_regime 0.528449(+0.002690, 잡음상한 초과) + E013 Sep-Oct 판정 재조합 이득 0"
+    },
+    {
+      "id": "f.lb_e004_gate",
+      "type": "fact",
+      "t": "E004_gate.csv public RMSE 0.537099 (score 26.594071). 로컬 4-hold 평균 1.089067, 예상구간 0.74~0.81 대비 -0.20. 로컬 hold 는 절대수준 판정기 아님; 계절앵커=test대변자 미확정",
+      "src": "2026-08-25 LB"
+    },
+    {
+      "id": "f.e009_ready",
+      "type": "fact",
+      "t": "E009_maskaug_diff.csv 조립 완료(sha256 8dc6a7cd34c8591919dccad7781a990ff3c99dd9d32b1f80b7d169a3462b674f, 26061행). E004_gate 와 결측 7766행만 다름: mean -0.006000, std 0.219228, max 2.255825. audit/check sub OK. public 차분이 maskaug 우열 유일 판정근거",
+      "src": "E009 2026-08-25"
+    },
+    {
+      "id": "f.lb_e009",
+      "type": "fact",
+      "t": "E009(결측행 maskaug) public RMSE 0.525759 vs E004 0.537099 = Δ-0.011340. 로컬 4-hold 는 정반대(+0.004738) 예측 → 4-hold 균등 판정기 무효, public 만 판정기",
+      "src": "2026-08-25 LB"
+    },
+    {
+      "id": "f.e010_e011_ready",
+      "type": "fact",
+      "t": "E010/E011 제출 조립 완료. E010 sha256 57aeef5ea806f422397058730ee969da188178932dfa20f7de73ddddb36c8974, E011 sha256 2ba9c6856f2e7be5fea79b9ea8fa3408a449c315600b5ee3558ea95930e9b4f3. 각 26061행, audit/check sub OK. E010 변경 18295=완전행, E011 변경 7766=결측행, 교집합 0",
+      "src": "E010/E011 2026-08-25"
+    },
+    {
+      "id": "f.sepoct_is_proxy",
+      "type": "fact",
+      "t": "판정기 확정: 2024_sepoct hold. public 0.525759 는 2024_sepoct 수준(0.49)이고 4-hold 평균(1.09)의 절반. 순서도 2024_sepoct 만 public 과 일치(maskaug 0.492306 < robust_blend 0.495506, public 0.525759 < 0.537099). test 2025-09-01~10-31 과 같은 성층붕괴기",
+      "src": "E012 bugcheck B5"
+    },
+    {
+      "id": "f.bugcheck_falsepos",
+      "type": "fact",
+      "t": "bugcheck FAIL 4개 중 3개 오탐: B1 마스크창 내부 학습행 0(16884행은 창 이후 11/1~12/10, 보간과제라 허용), B4 shift(-36)은 공개층 lead6h/trend12h + next() 오탐, F1 SEED=42 는 common.py:11 에 있고 C.SEED 참조. E3 만 미확인",
+      "src": "E012 2026-08-25"
+    },
+    {
+      "id": "f.no_submit_e010_e011",
+      "type": "fact",
+      "t": "E010(stack_regime 완전행)·E011(missing_only 결측행) 제출 보류. 2024_sepoct 판정기가 둘 다 패배 예측(stack_regime +0.018606, missing_only +0.004381). E010 은 G게이트 측정폭 0.00088 < 0.002 로 LB 구별 불가",
+      "src": "E012 G gate"
+    },
+    {
+      "id": "f.judge_confirmed",
+      "type": "fact",
+      "t": "2024_sepoct 판정기 검증 2/2. 결측행: maskaug 우세 예측 적중(public 0.537099->0.525759). 완전행: stack_regime 패배 예측 적중(0.525759->0.528449, +0.002690). 실측 초과분이 mse_shift 0.000461 의 6.1배라 stack_regime 완전행 변경은 체계적 오방향",
+      "src": "E010 LB 2026-08-25"
+    },
+    {
+      "id": "f.w_axis_closed",
+      "type": "fact",
+      "t": "결측행 w축 해석적 종료. pred_w=E002+w*(maskaug-E002). E[d2]=0.048101, public w=1 dMSE=-0.040448 -> E[d*e]=0.044275, w*=0.9205. w=1 이미 최적근처, w=1.5 는 dMSE -0.0246 로 악화, w*=0.92 이득은 RMSE 0.000087. 외삽/축소 제출 불필요",
+      "src": "E009/E004 public 2점"
+    },
+    {
+      "id": "f.pool_exhausted",
+      "type": "fact",
+      "t": "E013 Sep-Oct 판정: 저장 풀 재조합으로 maskaug 를 이기는 조합 없음. stack_global 가중이 maskaug 100% 로 붕괴(0.379210 동일), stack_regime +0.000489 패배. bugcheck PASS 19/FAIL 0. 남은 상승은 신규 학습축(a.residual_lgb, a.tide_context, a.profile_depth, a.same_sensor_gap)뿐",
+      "src": "E013 2026-08-25"
+    },
+    {
+      "id": "f.judge_3of3",
+      "type": "fact",
+      "t": "2024_sepoct 판정기 3/3 적중. E011 missing_only public 0.530045(+0.004286 vs E009), 예측 +0.004381. 잡음상한 0.532550 미만이라 오방향은 아님. 판정기 결측세그먼트(n=289)도 신뢰 가능",
+      "src": "E011 LB 2026-08-25"
+    },
+    {
+      "id": "f.anti_stack_signal",
+      "type": "fact",
+      "t": "완전행 d=stack_regime-robust_blend 의 E[d*e]=-0.00118823 음수. MSE(w)=MSE0+w2E[d2]-2wE[d*e] 항등식으로 w=-1(2*robust_blend-stack_regime) 예측 public 0.523935(-0.001824), w*=-2.5755 예측 0.522841. E[d2]=0.00046136 는 전체 test 기준이라 w=-1 로 포물선 3점 고정 먼저",
+      "src": "E010 LB 역산 2026-08-25"
+    },
+    {
+      "id": "f.g_gate_fixed",
+      "type": "fact",
+      "t": "bugcheck G 기준선 버그 수정(E016). check_g1 이 비교벡터를 baseline_interp.csv 에서 읽어 m=26061 을 냈다. 수정 후 base_csv=E009_maskaug_diff.csv, E014 m=18295 mse_shift=0.000461344, E015 m=7766 mse_shift=0.000246528. 임계 0.002->0.00002. 부수: E001_lgb_ensemble.csv 와 E001_lgb_full.csv 가 동일 파일",
+      "src": "E016 2026-08-25"
+    },
+    {
+      "id": "g.e017",
+      "type": "gate",
+      "t": "E017 결함 제거·예측 저장 fail-closed·빈 폴더 재현 manifest",
+      "src": "E017"
     }
   ],
   "edges": [

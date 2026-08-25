@@ -26,6 +26,22 @@ COLS = C.KEY + ["temp"]
 SCORE_COLS = ["sha256", "time", "file", "public", "local", "note"]
 
 
+def save_pool_pred(path, values):
+    path = Path(path)
+    values = np.asarray(values)
+    if not np.issubdtype(values.dtype, np.floating):
+        raise TypeError("pool 예측은 floating dtype이어야 합니다")
+    if not np.isfinite(values).all():
+        raise ValueError("pool 예측에 비유한값이 있습니다")
+    if np.unique(values).size < 3:
+        raise ValueError("pool 예측은 고유값이 3개 이상이어야 합니다")
+    stored = values.astype(np.float32)
+    if not np.isfinite(stored).all():
+        raise ValueError("float32 변환 후 비유한값이 있습니다")
+    np.save(path, stored)
+    return stored
+
+
 def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -40,8 +56,10 @@ def _upsert_jsonl(path, row):
     path.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in rows), encoding="utf-8")
 
 
-def audit(csv_path, pred_path=None, ledger=AUDITS, record=True):
+def audit(csv_path, pred_path, ledger=AUDITS, record=True):
     csv_path = Path(csv_path)
+    if pred_path is None:
+        raise ValueError("audit에는 --pred가 필요합니다")
     fails = []
     try:
         sub = pd.read_csv(csv_path, float_precision="round_trip")
@@ -75,7 +93,8 @@ def audit(csv_path, pred_path=None, ledger=AUDITS, record=True):
         try:
             pred = np.load(pred_path, allow_pickle=False)
             npy_exact = pred.shape == values.shape and np.array_equal(pred, values)
-            if not npy_exact:
+            npy_match = npy_exact or (pred.shape == values.shape and np.allclose(pred, values, rtol=0, atol=1e-5))
+            if not npy_match:
                 diff = np.max(np.abs(pred - values)) if pred.shape == values.shape and len(values) else math.inf
                 fails.append(f"NPY exact 불일치 shape={pred.shape}/{values.shape} maxdiff={diff}")
         except Exception as exc:
@@ -110,7 +129,11 @@ def public_add(csv_path, public, local=None, note="", score_path=SCORES, audit_p
     if not math.isfinite(public) or public < 0 or local is not None and (not math.isfinite(local) or local < 0):
         print("FAIL RMSE는 0 이상의 유한값이어야 합니다")
         return 1
-    rc, info = audit(csv_path, ledger=audit_path)
+    with tempfile.TemporaryDirectory() as td:
+        csv_values = pd.read_csv(csv_path, usecols=["temp"]).temp.to_numpy(float)
+        pred_file = Path(td) / "public_add.npy"
+        save_pool_pred(pred_file, csv_values)
+        rc, info = audit(csv_path, pred_file, ledger=audit_path)
     if rc:
         return rc
     score_path = Path(score_path)
@@ -141,10 +164,10 @@ def selftest():
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         idx = pd.read_csv(C.DATA / "test_index.csv")
-        good = idx[C.KEY].assign(temp=20.0)
+        good = idx[C.KEY].assign(temp=np.linspace(20.0, 21.0, len(idx)))
         good_path, pred_path = td / "good.csv", td / "good.npy"
         good.to_csv(good_path, index=False)
-        np.save(pred_path, good.temp.to_numpy())
+        save_pool_pred(pred_path, good.temp.to_numpy())
         audits, scores = td / "audits.jsonl", td / "scores.csv"
         assert audit(good_path, pred_path, audits)[0] == 0
         assert audit(good_path, pred_path, audits)[0] == 0
@@ -152,7 +175,15 @@ def selftest():
         bad = good.iloc[::-1]
         bad_path = td / "bad.csv"
         bad.to_csv(bad_path, index=False)
-        assert audit(bad_path, ledger=audits)[0] == 1
+        assert audit(bad_path, pred_path, ledger=audits)[0] == 1
+        blocked = td / "blocked.npy"
+        try:
+            save_pool_pred(blocked, np.ones(3, dtype=float))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("상수 pool 예측이 저장됨")
+        assert not blocked.exists()
         assert public_add(good_path, 1.2, 1.3, "a", scores, audits) == 0
         assert public_add(good_path, 1.1, 1.25, "updated", scores, audits) == 0
         saved = pd.read_csv(scores)
@@ -166,7 +197,7 @@ def selftest():
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
-    a = sub.add_parser("audit"); a.add_argument("csv"); a.add_argument("--pred")
+    a = sub.add_parser("audit"); a.add_argument("csv"); a.add_argument("--pred", required=True)
     p = sub.add_parser("public"); ps = p.add_subparsers(dest="public_cmd", required=True)
     add = ps.add_parser("add"); add.add_argument("csv"); add.add_argument("score", type=float)
     add.add_argument("--local", type=float); add.add_argument("--note", default="")

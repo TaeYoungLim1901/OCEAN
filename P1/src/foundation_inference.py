@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from features import make_features
 from foundation import sha, store_score
+from submission_tools import save_pool_pred
 from train import fill_short_gaps
 
 
@@ -28,13 +29,13 @@ def main():
         xte, num_iteration=meta["iterations"]["multiclass"]
     )
     multi = (1.0 - pm[:, 0]).astype(np.float32)
-    np.save(ROOT / "preds/test_binary_exp003.npy", binary)
-    np.save(ROOT / "preds/test_multiclass_exp003.npy", multi)
+    save_pool_pred(ROOT / "preds/test_binary_exp003.npy", binary)
+    save_pool_pred(ROOT / "preds/test_multiclass_exp003.npy", multi)
 
     if meta["promoted"]:
         score = (1 - meta["multi_weight"]) * binary + meta["multi_weight"] * multi
         pred = fill_short_gaps(score >= meta["threshold"], test, meta["hole"])
-        np.save(ROOT / "preds/test_exp003.npy", store_score(score - meta["threshold"] + 0.5, pred))
+        save_pool_pred(ROOT / "preds/test_exp003.npy", store_score(score - meta["threshold"] + 0.5, pred))
         sub = test[["station", "year", "layer", "time"]].assign(label=pred.astype(int))
         sub.to_csv(ROOT / "subs/exp003.csv", index=False)
         meta["submission_sha256"] = sha(ROOT / "subs/exp003.csv")

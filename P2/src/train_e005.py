@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 from gate_e004 import HOLDS, holdout, regimes, score
 from train import estimator
+from submission_tools import save_pool_pred
 
 FEATURES = C.FULL + [
     *(f"public_observed_{layer}" for layer in C.PUBLIC_LAYERS),
@@ -213,9 +214,9 @@ def main():
             raw = predict(fit_models(x_fit, rows_fit), x_val, val)
             gated = np.where(flags, raw, base)
             oof_parts[candidate].append(gated)
-            np.save(cache / f"oof_{label}_{candidate}_E005.npy", gated)
+            save_pool_pred(cache / f"oof_{label}_{candidate}_E005.npy", gated)
             hold_reports[candidate] = score(val, x_val, gated)
-        np.save(cache / f"oof_{label}_e004_E005.npy", base)
+        save_pool_pred(cache / f"oof_{label}_e004_E005.npy", base)
         _write_json(cache / f"metrics_{label}.json", hold_reports)
         elapsed = time.perf_counter() - hold_started
         runtime["holds"][label] = {"seconds": elapsed, "completed": True, "n": len(val)}
@@ -229,7 +230,7 @@ def main():
         all_completed = False
     if all_completed:
         for candidate, parts in oof_parts.items():
-            np.save(C.ROOT / "preds" / f"oof_{candidate}_E005.npy", np.concatenate(parts))
+            save_pool_pred(C.ROOT / "preds" / f"oof_{candidate}_E005.npy", np.concatenate(parts))
 
         all_rows = obs[obs.layer.isin(C.TARGET_LAYERS) & obs.temp.notna()].reset_index(drop=True)
         x_clean = add_mask_features(C.build_features(obs, all_rows, tide_correct=True, use_target_depth=True))
@@ -249,7 +250,7 @@ def main():
             x_fit, rows_fit = _fit_input(x_clean, x_aug, all_rows, candidate, augmented_rows)
             raw = predict(fit_models(x_fit, rows_fit), x_test, test_rows)
             gated = np.where(test_flags, np.clip(raw, -5, 45), baseline_test)
-            np.save(C.ROOT / "preds" / f"test_{candidate}_E005.npy", gated)
+            save_pool_pred(C.ROOT / "preds" / f"test_{candidate}_E005.npy", gated)
 
     runtime["total_seconds"] = time.perf_counter() - started
     runtime["completed_all"] = all_completed

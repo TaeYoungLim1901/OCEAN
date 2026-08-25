@@ -17,8 +17,8 @@ def rmse(y, p, mask):
 
 def main():
     y = np.load(CACHE / "oof_true.npy")
-    damped = np.load(P3 / "preds" / "oof_damped_p3_t1.npy")
-    lgbm = np.load(P3 / "preds" / "oof_lgbm_p3_t1.npy")
+    damped = np.load(CACHE / "oof_damped_p3_t1.npy")
+    lgbm = np.load(CACHE / "oof_lgbm_p3_t1.npy")
     cases = pd.read_parquet(CACHE / "oof_cases.parquet")
     fold_map = pd.read_csv(CACHE / "folds.csv").set_index("case_id").fold
     folds = fold_map.loc[cases.case_id].to_numpy()
@@ -41,7 +41,7 @@ def main():
         print(f"WARNING: grid weight_lgbm={searched_weight:.2f} != fixed weight_lgbm={fixed_weight_lgbm:.2f}")
     weight = fixed_weight_lgbm
     blend = (1 - weight) * damped + weight * lgbm
-    np.save(P3 / "preds" / "oof_final_p3_t1f.npy", blend)
+    np.save(CACHE / "oof_final_p3_t1f.npy", blend)
     report = {"selected_weight_lgbm": weight,
               "grid_weight_lgbm": searched_weight,
               "fixed_weight_lgbm": fixed_weight_lgbm,

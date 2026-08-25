@@ -9,6 +9,7 @@ from scipy.optimize import least_squares
 
 import cases as C
 import metric as M
+from submission_tools import save_pool_pred
 
 sys.stdout.reconfigure(encoding="utf-8")
 SEED = 42
@@ -144,8 +145,8 @@ def main():
     u_map, delta_map = context_values_train(all_cases)
     u = ev.case_id.map(u_map).to_numpy(float)
     regime = regime_labels(ev.case_id.map(delta_map).to_numpy(float))
-    t1f = np.load(PREDS / "oof_final_p3_t1f.npy", allow_pickle=False)
-    damped = np.load(PREDS / "oof_damped_p3_t2.npy", allow_pickle=False)
+    t1f = np.load(P3 / "cache" / "p3_t1" / "oof_final_p3_t1f.npy", allow_pickle=False)
+    damped = np.load(P3 / "cache" / "p3_t2" / "oof_damped_p3_t2.npy", allow_pickle=False)
     if t1f.shape != y.shape or damped.shape != y.shape:
         raise RuntimeError(f"OOF shape mismatch t1f={t1f.shape} damped={damped.shape} y={y.shape}")
     persist = np.repeat(ev.hs0.to_numpy(float)[:, None], len(C.LEADS), axis=1)
@@ -203,8 +204,8 @@ def main():
     test_u = test_cases.case_id.map(test_u_map).to_numpy(float)
     test_damped = np.load(PREDS / "test_damped_p3_t2.npy", allow_pickle=False)
     test_eq = predict(test_cases, test_u, full_params, test_damped)
-    np.save(PREDS / "oof_eqrelax_p3_t6.npy", oof)
-    np.save(PREDS / "test_eqrelax_p3_t6.npy", test_eq)
+    np.save(CACHE / "oof_eqrelax_p3_t6.npy", oof)
+    save_pool_pred(PREDS / "test_eqrelax_p3_t6.npy", test_eq)
 
     params_json = {st: {"a": float(q[0]), "b": float(q[1]), "T": float(q[2])}
                    for st, q in full_params.items()}
@@ -219,8 +220,8 @@ def main():
     if accepted:
         test_t1f = np.load(PREDS / "test_final_p3_t1f.npy", allow_pickle=False)
         test_final = (1.0 - eq_weight) * test_t1f + eq_weight * test_eq
-        np.save(PREDS / "oof_final_p3_t6.npy", blend)
-        np.save(PREDS / "test_final_p3_t6.npy", test_final)
+        np.save(CACHE / "oof_final_p3_t6.npy", blend)
+        test_final = np.load(save_pool_pred(PREDS / "test_final_p3_t6.npy", test_final), allow_pickle=False)
         index = pd.read_csv(P3 / "P3_data" / "test_index.csv")
         values = {(cid, st, lead): float(test_final[i, j])
                   for i, (cid, st) in enumerate(zip(test_cases.case_id, test_cases.station))
@@ -259,7 +260,7 @@ def main():
                         "blend_improvement_ge_0.003": bool(
                             blend_score["total"] <= work0_report["t1f"]["total"] - 0.003),
                         "max_worsening_n_ge_20_le_0.03": bool(max_worsening <= 0.03)},
-        "outputs": [str(PREDS / "oof_eqrelax_p3_t6.npy"), str(PREDS / "test_eqrelax_p3_t6.npy")],
+        "outputs": [str(CACHE / "oof_eqrelax_p3_t6.npy"), str(PREDS / "test_eqrelax_p3_t6.npy")],
         "submission": submission,
     }
     (CACHE / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -10,6 +10,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
 from train_e003 import predict_eof, predict_layers, regimes
+from submission_tools import save_pool_pred
 
 
 def calculate():
@@ -39,12 +40,12 @@ def calculate():
 def main():
     artifact, rows, predictions = calculate()
     for name, pred in predictions.items():
-        np.save(C.ROOT / "preds" / f"test_{name}_E003.npy", pred)
+        save_pool_pred(C.ROOT / "preds" / f"test_{name}_E003.npy", pred)
     if not artifact["accepted"]:
         print(f"selected=E002; E003 submission not created; candidates={','.join(predictions)}")
         return
     pred = predictions[artifact["selected"]]
-    np.save(C.ROOT / "preds" / "test_E003.npy", pred)
+    save_pool_pred(C.ROOT / "preds" / "test_E003.npy", pred)
     keys = pd.read_csv(C.DATA / "test_index.csv")[C.KEY]
     sub = keys.assign(temp=np.clip(pred, -5, 45))
     path = C.ROOT / "subs" / "E003_final.csv"

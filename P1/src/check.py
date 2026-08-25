@@ -1,5 +1,10 @@
 """P1 사전/생산 게이트. `판정: OK`가 아니면 진행 금지."""
+import hashlib
+import json
+import subprocess
 import sys
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -83,6 +88,61 @@ def pipeline(sub_path, oof_path, test_path):
     return verdict(fails)
 
 
+def hashes():
+    files = {}
+    for path in sorted(DATA.iterdir()):
+        if path.is_file():
+            files[str(path.relative_to(ROOT)).replace("\\", "/")] = hashlib.sha256(path.read_bytes()).hexdigest().upper()
+    (ROOT / "data_hashes.json").write_text(json.dumps({"files": files}, indent=2) + "\n", encoding="utf-8")
+    for name, value in files.items():
+        print(f"  {name} {value}")
+    return verdict([])
+
+
+def final(path):
+    path = Path(path).resolve()
+    stem = path.stem
+    pred = ROOT / "preds" / f"test_{stem}.npy"
+    weights = sorted((ROOT / "models").glob(f"{stem}_fold*.txt"))
+    if stem != "exp002" or not pred.exists() or len(weights) != 4:
+        return verdict([f"final artifact set missing for {stem}"])
+    with tempfile.TemporaryDirectory() as td_name:
+        td = Path(td_name)
+        code = ROOT / "src/final_inference.py"
+        (td / "final_inference.py").write_bytes(code.read_bytes())
+        (td / "features.py").write_bytes((ROOT / "src/features.py").read_bytes())
+        (td / "train.py").write_bytes((ROOT / "src/train.py").read_bytes())
+        weight_dir = td / "weights"
+        weight_dir.mkdir()
+        for weight in weights:
+            (weight_dir / weight.name).write_bytes(weight.read_bytes())
+        reproduced = td / "reproduced.csv"
+        run = subprocess.run(
+            [sys.executable, str(td / "final_inference.py"), "--data-root", str(DATA),
+             "--weights-dir", str(weight_dir), "--output", str(reproduced)],
+            cwd=td, capture_output=True, text=True, encoding="utf-8"
+        )
+        if run.returncode or not reproduced.exists():
+            return verdict([f"final inference failed rc={run.returncode}: {run.stderr.strip()[-240:]}"])
+        sha = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest().upper()
+        expected_sha, actual_sha = sha(path), sha(reproduced)
+        if actual_sha != expected_sha:
+            return verdict([f"final sha256 mismatch expected={expected_sha} actual={actual_sha}"])
+        manifest = {
+            "csv": str(path.relative_to(ROOT.parent)).replace("\\", "/"),
+            "csv_sha256": expected_sha,
+            "pred_npy": str(pred.relative_to(ROOT.parent)).replace("\\", "/"),
+            "pred_sha256": sha(pred),
+            "code_files": {f"P1/src/{name}": sha(ROOT / "src" / name) for name in ("final_inference.py", "features.py", "train.py")},
+            "weights": {str(w.relative_to(ROOT.parent)).replace("\\", "/"): sha(w) for w in weights},
+            "seed": 42,
+            "created": datetime.now(timezone.utc).isoformat(),
+        }
+        (path.parent / f"{stem}.manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(f"  reproduced_sha256={actual_sha}")
+        return verdict([])
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "data":
@@ -91,6 +151,10 @@ if __name__ == "__main__":
         sys.exit(sub(sys.argv[2]))
     if cmd == "pipeline":
         sys.exit(pipeline(*sys.argv[2:5]))
+    if cmd == "hashes":
+        sys.exit(hashes())
+    if cmd == "final" and len(sys.argv) == 3:
+        sys.exit(final(sys.argv[2]))
     if cmd == "reproduce" and len(sys.argv) == 3 and sys.argv[2] == "exp002":
         from exp002 import reproduce
         sys.exit(reproduce())

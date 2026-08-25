@@ -17,6 +17,7 @@ from diag_t4 import apply_reference, forward_mask, honest_reference
 from exp004 import _inner_metrics, fill_runs
 from features import SEED, make_features
 from metric import evaluate, f1
+from submission_tools import save_pool_pred
 from train import fill_short_gaps, segment_ids
 
 
@@ -33,6 +34,13 @@ EXPECTED_EXP004_F1 = 2.0 * EXPECTED_EXP004[0] / (2.0 * EXPECTED_EXP004[0] + EXPE
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest().upper()
+
+
+def store_score(score, pred, threshold):
+    z = np.clip(np.nan_to_num(score, nan=0.0) - threshold + 0.5, 0, 1).astype(np.float32)
+    z[pred] = np.maximum(z[pred], 0.5)
+    z[~pred] = np.minimum(z[~pred], np.nextafter(np.float32(0.5), np.float32(0)))
+    return z
 
 
 def params():
@@ -338,8 +346,8 @@ def main():
     test_stream_rows = stream_rates(test, test_out)
     test_rate = float(test_out.mean())
 
-    np.save(ROOT / "preds/oof_exp005.npy", oof_pred)
-    np.save(ROOT / "preds/test_exp005.npy", test_out)
+    save_pool_pred(ROOT / "preds/oof_exp005.npy", store_score(blend_oof, oof_pred, selected["threshold"]))
+    save_pool_pred(ROOT / "preds/test_exp005.npy", store_score(blend_test, test_pred, selected["threshold"]))
     key = ["station", "year", "layer", "time"]
     sub = test[key].assign(label=test_out.astype(int))
     sample = pd.read_csv(ROOT / "P1_data/sample_submission.csv", usecols=key)

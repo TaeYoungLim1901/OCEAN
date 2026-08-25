@@ -8,6 +8,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
+from submission_tools import save_pool_pred
 
 
 def predict_one(name, artifact, x, rows):
@@ -28,7 +29,7 @@ def main():
     x = C.build_features(obs, rows, base)
     singles = {name: predict_one(name, artifact, x, rows) for name in ("ridge_full", "lgb_basic", "lgb_full")}
     for name, pred in singles.items():
-        np.save(C.ROOT / "preds" / f"test_{name}_E001.npy", pred)
+        save_pool_pred(C.ROOT / "preds" / f"test_{name}_E001.npy", pred)
     selected = artifact["selected"]
     if selected.startswith("blend_"):
         match = re.fullmatch(r"blend_(ridge_full|lgb_basic)_(lgb_full)_(0\.25|0\.50|0\.75)", selected)
@@ -38,7 +39,7 @@ def main():
         pred = (1 - w) * singles[a] + w * singles[b]
     else:
         pred = singles[selected]
-    np.save(C.ROOT / "preds" / f"test_{selected}_E001.npy", pred)
+    save_pool_pred(C.ROOT / "preds" / f"test_{selected}_E001.npy", pred)
     # 채점기는 time 문자열까지 키로 비교하므로 배포 index의 원문 키를 그대로 보존한다.
     sub = pd.read_csv(C.DATA / "test_index.csv")[C.KEY].assign(temp=np.clip(pred, -5, 45))
     path = C.ROOT / "subs" / "E001_lgb_full.csv"

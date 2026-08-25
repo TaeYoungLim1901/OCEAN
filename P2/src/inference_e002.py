@@ -8,6 +8,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C
+from submission_tools import save_pool_pred
 
 
 def calculate():
@@ -21,14 +22,15 @@ def calculate():
     pred = np.empty(len(rows))
     for layer in C.TARGET_LAYERS:
         use = rows.layer.eq(layer)
-        pred[use] = x.loc[use, "base_nom"] + artifact["models"][layer].predict(x.loc[use, artifact["features"]])
+        model = artifact["models"][layer]
+        pred[use] = x.loc[use, "base_nom"] + model.predict(x.loc[use, artifact["features"]])
     keys = pd.read_csv(C.DATA / "test_index.csv")[C.KEY]
     return pred, keys.assign(temp=np.clip(pred, -5, 45)), artifact
 
 
 def main():
     pred, sub, artifact = calculate()
-    np.save(C.ROOT / "preds" / f"test_{artifact['selected']}_E002.npy", pred)
+    save_pool_pred(C.ROOT / "preds" / f"test_{artifact['selected']}_E002.npy", pred)
     path = C.ROOT / "subs" / "E002_final.csv"
     sub.to_csv(path, index=False)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()

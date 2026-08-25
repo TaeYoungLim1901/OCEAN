@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from features import make_features
 from metric import evaluate, f1
+from submission_tools import save_pool_pred
 from train import fill_short_gaps, segment_ids
 from diag_t4 import apply_reference, forward_mask, honest_reference
 
@@ -27,6 +28,13 @@ EXPECTED_OUTER = (4935, 500, 2508)
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest().upper()
+
+
+def store_score(score, pred, threshold):
+    z = np.clip(np.nan_to_num(score, nan=0.0) - threshold + 0.5, 0, 1).astype(np.float32)
+    z[pred] = np.maximum(z[pred], 0.5)
+    z[~pred] = np.minimum(z[~pred], np.nextafter(np.float32(0.5), np.float32(0)))
+    return z
 
 
 def model_scores(x, folds=None, raw=None, honest_outer=False):
@@ -228,8 +236,8 @@ def main():
     type_rows, station_rows = _outer_breakdown(train, oof_pred, outer)
     oof_out = oof_pred.astype(np.uint8)
     test_out = test_pred.astype(np.uint8)
-    np.save(ROOT / "preds/oof_exp004.npy", oof_out)
-    np.save(ROOT / "preds/test_exp004.npy", test_out)
+    save_pool_pred(ROOT / "preds/oof_exp004.npy", store_score(selected_score, oof_pred, selected["threshold"]))
+    save_pool_pred(ROOT / "preds/test_exp004.npy", store_score(selected_test_score, test_pred, selected["threshold"]))
 
     key = ["station", "year", "layer", "time"]
     sub = test[key].assign(label=test_out.astype(int))

@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 import cases as C
+from submission_tools import save_pool_pred
 from train_t2 import regime_labels
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -115,9 +116,9 @@ def main():
         raise RuntimeError("T1F/T2 fold case alignment mismatch")
     cases = t1_cases.reset_index(drop=True)
     y = np.column_stack([cases[f"y{lead}"].to_numpy(float) for lead in C.LEADS])
-    baseline = np.load(PREDS / "oof_final_p3_t1f.npy", allow_pickle=False)
-    damped = np.load(PREDS / "oof_damped_p3_t2.npy", allow_pickle=False)
-    extra = np.load(PREDS / "oof_extra_p3_t2.npy", allow_pickle=False)
+    baseline = np.load(P3 / "cache" / "p3_t1" / "oof_final_p3_t1f.npy", allow_pickle=False)
+    damped = np.load(P3 / "cache" / "p3_t2" / "oof_damped_p3_t2.npy", allow_pickle=False)
+    extra = np.load(P3 / "cache" / "p3_t2" / "oof_extra_p3_t2.npy", allow_pickle=False)
     t2 = (damped + extra) / 2
     valid = np.isfinite(t2).all(axis=1)
     if int(valid.sum()) != 216 or not np.array_equal(valid, folds.fold.isin([1, 2, 3, 4]).to_numpy()):
@@ -147,7 +148,7 @@ def main():
     with np.load(T2_CACHE / "ckpt" / "test_preds.npz", allow_pickle=False) as saved:
         for name in ("damped", "extra", "lgbm_pooled", "lgbm_lead", "lgbm_station"):
             target = PREDS / f"test_{name}_p3_t2.npy"
-            np.save(target, saved[name])
+            save_pool_pred(target, saved[name])
             test_pool[name] = {"path": str(target), "sha256": sha256(target), "shape": list(saved[name].shape)}
 
     leak = t1_leak_check(pd.read_parquet(P3 / "cache" / "cases.parquet").reset_index(drop=True),

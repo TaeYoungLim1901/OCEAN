@@ -31,15 +31,8 @@
     {
       "id": "r.model_submit",
       "type": "rule",
-      "t": "2026-09-07 까지 코드+가중치 제출. 업로드한 예측을 재현하지 못하면 성적 무효. 제출 즉시 답안 업로드 종료",
+      "t": "RULES.md §0 참조",
       "src": "제출안내 2,3",
-      "hard": true
-    },
-    {
-      "id": "r.sub_daily",
-      "type": "rule",
-      "t": "답안 업로드 팀당 하루 1회. 8/20 개시",
-      "src": "제출안내 1",
       "hard": true
     },
     {
@@ -542,6 +535,150 @@
       "type": "asset",
       "t": "다음 P3 세션 시작 프롬프트와 1기 제출 일정·해시·함정 3개. 세션 첫 입력으로 붙여넣는다",
       "src": "P3/START.md"
+    },
+    {
+      "id": "f.ops_day1_ready",
+      "type": "fact",
+      "t": "2026-08-13 운영 세션 종료: private GitHub TaeYoungLim1901/OCEAN main과 local/remote SHA 9fde75574ef156beabea40d19a8b7a78ae0ac1a0 일치; tracked=111, 금지 파일=0, PR=0; ocean-daily-close quick_validate=0; Public ledger=0/3 대기; 미추적=20 보존; 8/20 전 추가 실험=0. Trigger: 2026-08-20 이후 P1/P2/P3 실제 CSV·NPY·Public 점수 3세트 수령 시 daily-close skill 1회로 audit→기록→private push",
+      "src": "P3/specs/OPS-2026-08-13-session-close.md"
+    },
+    {
+      "id": "f.lb_picks_dense_judge",
+      "type": "fact",
+      "t": "public LB 가 조밀 재가중 판정기를 지지한다. LB(lgbm)=0.591543 < LB(damped)=0.642689, 델타 0.051146. 조밀 재가중 fold4 는 lgbm 0.614009 < damped 0.663402 로 같은 부호, 씨닝 fold4 는 damped 0.770747 < lgbm 0.775590 로 반대 부호. f.thinned_judge_inverts 의 두 후보 중 조밀 쪽이 맞았다",
+      "src": "p3_lb1 2026-08-25 사전등록 규칙 A"
+    },
+    {
+      "id": "f.damped_lgbm_line_exhausted",
+      "type": "fact",
+      "t": "damped-lgbm 단순선 위 public MSE 는 w 의 정확한 2차식이며 3점으로 완전히 결정된다. A=0.119800 B=-0.056674 C=0.349923, 볼록, 내부 최소 w*=0.236536, RMSE(w*)=0.585850. 현행 T1F(w=0.35) 0.587165 대비 개선 0.001315 로 사전등록 임계 0.003 미달. 이 축에서 더 얻을 것이 없다",
+      "src": "p3_lb1 2026-08-25 bugcheck.py wcurve"
+    },
+    {
+      "id": "a.lb_quadratic_simplex",
+      "type": "axis",
+      "t": "3성분(persistence·damped·lgbm) 단순형 위 public MSE 는 자유가중 2개의 정확한 2차형이다. 계수 6개 중 순수 예측항 3개(a,b,c)는 정답 없이 저장 예측만으로 계산되고, 나머지 3개(d,e,f)는 이미 가진 LB 3점으로 결정된다. 로컬 선택 0회, 탐색 0회, 전역 최적을 해석적으로 얻는다. a.gated_blend 와 구별: 그 축은 로컬 폴드로 가중을 골라 f.gated_weight_overfit 로 기각됐고, 이 축은 로컬 판정기를 전혀 쓰지 않는다",
+      "src": "2026-08-25 사용자 승인. f.damped_lgbm_line_exhausted 후속",
+      "status": "open"
+    },
+    {
+      "id": "f.public_is_easy_subset",
+      "type": "fact",
+      "t": "public 점수는 전체 1200행이 아니다. 정답 없이 계산되는 mean((damped-lgbm)^2) 이 전체 1200행에서 0.157493, public LB 3점 적합이 주는 값은 0.119800 으로 상대오차 31.5%. public 부분집합은 두 모델 불일치가 24% 작은 쉬운 쪽에 쏠려 있고 여집합(private)은 더 어렵다. 전체 test 통계로 계산한 계수를 public 에 적용하면 안 된다",
+      "src": "p3_t18 2026-08-25 bugcheck.py simplex V1"
+    },
+    {
+      "id": "f.public_small_random_subset",
+      "type": "fact",
+      "t": "public 은 200사례 중 약 80사례 이하의 무작위 부분집합과 모순되지 않는다. mean((D-L)^2) 의 사례단위 부트스트랩 z 는 k=20/40/60/80 에서 -0.76/-1.14/-1.47/-1.87, k=140 에서 -3.37, k=180 에서 -6.92. 구조적 분할(리드·정점) 후보는 6개가 동시에 맞아 식별 불가. 결과: LB 델타는 표본오차가 크다. k=80 기준 sd(mean((D-L)^2))=0.0203 으로 전체값의 13%",
+      "src": "p3_t19 2026-08-25 bugcheck.py subset"
+    },
+    {
+      "id": "f.public_easy_bias_retracted",
+      "type": "fact",
+      "t": "f.public_is_easy_subset 의 '쉬운 쪽 편중' 해석은 철회한다. b_pub/b_full=0.761 은 편중이 아니라 작은 무작위 표본의 변동으로 설명된다 (k<=80 에서 |z|<=1.87). public 이 전체 1200행이 아니라는 사실 자체는 유효하다",
+      "src": "p3_t19 2026-08-25 작업1"
+    },
+    {
+      "id": "r.sub_daily3",
+      "type": "rule",
+      "t": "RULES.md §0 참조",
+      "src": "2026-08-25 사용자 확인"
+    },
+    {
+      "id": "r.external_data_unmentioned",
+      "type": "rule",
+      "t": "대회 배포 원문에 외부 데이터 학습 사용·사전학습 가중치 사용에 대한 언급이 없다 (T20 원문 조사, P3/P3CONTEXT.md 전문 확인). r.permissive 에 따라 허용으로 해석한다. 단 r.model_submit 상 9/7 코드+가중치 재현 요건이 있으므로 외부 데이터에 의존하면 그 데이터도 재현 가능해야 한다. r.context_only 는 추론 입력 제약이므로 외부 데이터로 학습한 가중치는 저촉되지 않는다",
+      "src": "T20 2026-08-25 원문 조사"
+    },
+    {
+      "id": "a.arx_kalman",
+      "type": "axis",
+      "t": "원시 48h 시계열을 결측 허용 ARX·선형 상태공간 필터로 순차 예측. 윈도 요약 피처를 쓰지 않는다. scipy 만 사용. a.equilibrium_relax 의 단일 평형 ODE 와 다르며 트리 계열이 아니다",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "closed",
+      "evidence": "T21: 단독 조밀 재가중 fold1-4 0.575800/0.639721/0.693044/0.672507. folds1-3 lgbm_t1 잔차상관 0.832120 (풀 다양성은 실재). folds1-3 선택 블렌드 (pers .00/damped .05/lgbm .25/arx .15/wsswell .55) 선택 0.607127, 봉인 fold4 0.633913 = T1F 0.611959 대비 +0.021954 악화. 사전등록 제출채택 임계 0.005 개선 미달. 대조군 4종 델타 0.000000 으로 채점경로 동일 확인"
+    },
+    {
+      "id": "a.windsea_swell_components",
+      "type": "axis",
+      "t": "tp·wspd·wvdir·wdir 로 풍파/너울 상태를 분리하고 성분별 persistence·감쇠 후 합산. 혼합 상태를 단일 hs 로 처리하는 기존 3멤버와 regime 별 오차 원인이 다르다",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "closed",
+      "evidence": "T21: 단독 조밀 재가중 fold1-4 0.574258/0.632815/0.663154/0.668720. folds1-3 lgbm_t1 잔차상관 0.759305 (풀 최저). 폴백률 학습 0.305383 vs test 0.005000 불일치. 블렌드 봉인 fold4 0.633913 = T1F 대비 +0.021954 악화, 사전등록 임계 미달"
+    },
+    {
+      "id": "a.multioutput_joint_tree",
+      "type": "axis",
+      "t": "리드 6개 delta 를 (n,6) 다중출력으로 한 번에 학습. 현행 train.py:72-89 는 리드별 scalar 반복. a.station_lead_experts 의 전문가 분할과 다르다",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "a.spectral_forecast",
+      "type": "axis",
+      "t": "48h hs/tp/wspd 의 FFT 대역에너지·주기·위상 피처. 평균·표준편차·기울기로 보존되지 않는 주파수 구조. 상대 시퀀스만 쓰므로 a.calendar_features 와 무관",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "a.ratio_target",
+      "type": "axis",
+      "t": "타깃을 y/(hs0+eps) 또는 그 로그로 바꿔 학습하고 hs0 로 복원. 규모 정규화 오차 학습",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "a.log_target_smearing",
+      "type": "axis",
+      "t": "타깃 log1p(y) 학습 + train-fold smearing 보정 후 원공간 복원",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "a.huber_objective",
+      "type": "axis",
+      "t": "LightGBM 목적함수를 L2 에서 고정 Huber 로. 하이퍼파라미터 변형이 아니라 손실함수 변경",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "a.underused_atmos_derivatives",
+      "type": "axis",
+      "t": "tp·airt·relh·caph 변화율·결측 연계 파생 추가. features_t2.py:25-45 에 해당 4열 파생이 없다",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "a.external_pretrain_linear",
+      "type": "axis",
+      "t": "외부 파랑 시계열로 선형 AR·기저 표현 사전학습 후 대회 자료로 보정. r.external_data_unmentioned 로 규정상 허용. 추론은 289행만 사용. 데이터 확보·재현 경로가 선결 과제",
+      "src": "T20 2026-08-25 축 발굴",
+      "status": "open"
+    },
+    {
+      "id": "s.t22_shift_probe",
+      "type": "asset",
+      "t": "P3/subs/submission_p3_t1f_shift.csv; SHA256 C80CFA144E552DCD2D8E6DF6FDBC94B1AA6D48BAD1180C191C3CBB83F92CC54B; 1200 rows; +0.05; clipped 0",
+      "src": "P3/src/make_probe_sub.py; T22 validation 2026-08-25"
+    },
+    {
+      "id": "f.t23_control_bias",
+      "type": "fact",
+      "t": "T23 저장 OOF 대조군 fold4 재가중: lgbm_t1 0.614009 / t1f 0.611959 / damped 0.663402 / persistence 0.769115. T1F bias weighted +0.035651675, unweighted +0.016010958; shift c=-0.035651675 후 fold4 0.607162(delta -0.004798); bootstrap sd 0.008937089, z_public +0.660017",
+      "src": "P3/src/run_t21.py --folds 4; P3/cache/p3_t21/report.csv; 2026-08-25"
+    },
+    {
+      "id": "f.nontree_breaks_corr_wall",
+      "type": "fact",
+      "t": "비트리 멤버 2종이 f.pool_no_diversity 의 상관 0.90 벽을 처음 뚫었다. 조밀 folds1-3 lgbm_t1 잔차 Pearson: wsswell 0.759305 / arx 0.832120 (LGBM 변형 6개는 0.988~0.996). 자산 preds/{oof_dense,test}_{arx,wsswell}_p3_t21.npy 4개 보존. 단독·블렌드로는 T1F 를 못 이겼다",
+      "src": "T21 2026-08-25"
+    },
+    {
+      "id": "f.t1f_positive_bias",
+      "type": "fact",
+      "t": "T1F 는 계통적으로 과대예측한다. public 실측 편향 +0.041550308 (T1F 0.587165 vs T1F+0.05 0.592805 에서 등식으로 도출, 재구성오차 0). 로컬 조밀 OOF 가중 편향 +0.035651675, 사례 부트스트랩 sd 0.008937089, z_vs_public +0.660017. 리드 6개 전부 양수 (+0.0259~+0.0424). 상수보정 c=-0.035652 는 조밀 fold4 를 0.611959 에서 0.607162 로 -0.004798 개선",
+      "src": "T22 public 탐침 + T23 로컬 측정 2026-08-25"
     }
   ],
   "edges": [
@@ -734,6 +871,16 @@
       "f.t9_weighted_dense",
       "measures",
       "f.thinned_judge_inverts"
+    ],
+    [
+      "s.t22_shift_probe",
+      "derives_from",
+      "s.t1f_submission"
+    ],
+    [
+      "f.t23_control_bias",
+      "derives_from",
+      "f.t9_weighted_dense"
     ]
   ]
 }

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from features import make_features
 from metric import evaluate, f1
+from submission_tools import save_pool_pred
 from train import fill_short_gaps, segment_ids
 
 
@@ -110,8 +111,8 @@ def main():
     outer = folds == 3
     outer_stats = f1(y[outer], oof_pred[outer])
 
-    np.save(ROOT / "preds/oof_exp002.npy", store_score(oof_score - threshold + 0.5, oof_pred))
-    np.save(ROOT / "preds/test_exp002.npy", store_score(test_score - threshold + 0.5, test_pred))
+    save_pool_pred(ROOT / "preds/oof_exp002.npy", store_score(oof_score - threshold + 0.5, oof_pred))
+    save_pool_pred(ROOT / "preds/test_exp002.npy", store_score(test_score - threshold + 0.5, test_pred))
     sub = test[["station", "year", "layer", "time"]].assign(label=test_pred.astype(int))
     sub.to_csv(ROOT / "subs/exp002.csv", index=False)
     by_type = evaluate(train.loc[outer].assign(anomaly_type=train.loc[outer].anomaly_type.fillna("normal")), oof_pred[outer], ["anomaly_type"])
