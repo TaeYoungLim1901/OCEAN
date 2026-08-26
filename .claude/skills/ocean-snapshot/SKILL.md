@@ -54,7 +54,8 @@ description: OCEAN 작업 트리를 개인 private GitHub 저장소 TaeYoungLim1
    `.gitignore`, `.claude`, `docs`, `scripts`, 루트 `*.md` (공고문 원문 포함),
    그리고 각 문제의 최상위 `*.md` (`AGENTS.md`·`NEXT.md`·`*CONTEXT.md`·`*_RESEARCH.md` 등),
    `graph.json`, `src`, `specs`,
-   `P1/experiments/log.md`·`P1/experiments/public_scores.csv` (P2·P3 동형).
+   `P1/experiments/log.md`·`P1/experiments/public_scores.csv`·`P1/experiments/*.json`·
+   `P1/data_hashes.json` (P2·P3 동형).
 4. 커밋 전 스테이징된 파일 이름과 바이트를 전부 출력한다. 다음이 하나라도 있으면 커밋하지 말고 멈춘다:
    데이터·cache·models·preds·subs·codex 실행 로그, `.env`/`.pem`/`.key`,
    `.npy`/`.npz`/`.pkl`/`.parquet` 등 이진·모델·예측 확장자, 비밀값 후보,

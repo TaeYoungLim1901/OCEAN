@@ -11,6 +11,33 @@
 | P2 | `P2/subs/E002_final.csv` | `F88AC4BF1254C1A8AD52A8505A0CFFADE67ECC23AC637E296A1CAC8B854D2AA9` | 2024 RMSE `0.517441`, 2025 pseudo-gap `1.301486` |
 | P3 | `P3/subs/submission_p3_t1f.csv` | `2E4984283B047950E5D2DA219EF6D8B3D02D7FEB54CC67DAA2AF75764D3470C1` | 씨닝 뷰A(216) `0.801413`, 씨닝 fold4 `0.750315`, 조밀 재가중 fold4 `0.611959` |
 
+## 2026-08-26 세션 (P1·P2·P3 통합 1회) 결과
+
+`docs/PORT-PLAN-2026-08-25.md` 9단계를 전부 반영하고 `gpt-5.6-sol` 적대검토(`P1/experiments/logs/sol_R3.log`)로
+결함 7건을 잡아 수정했다. 현재 상태:
+
+| 게이트 | 명령 | 판정 |
+|---|---|---|
+| 문제별 결함 | `python P{n}/src/bugcheck.py all` | P1·P2·P3 전부 `OK` exit 0 |
+| 규정 복사본 | `python scripts/preflight.py rules` | `OK` |
+| 사양·줄끝 | `python scripts/preflight.py selftest` | `OK` |
+| 제출 재현 | `python P{n}/src/check.py final <csv>` | 3/3 바이트 일치 |
+| 전역 장벽 | `python scripts/preflight.py final --p1 … --p2 … --p3 …` | `READY` |
+
+사고 3건과 대응:
+
+1. luna 가 `scripts/cx.sh` 를 CRLF 로 저장해 위임 경로 전체가 죽었다 → LF 정규화,
+   `preflight selftest` 에 줄끝 검사 추가.
+2. P3 `check.py final` 이 채점된 제출물을 float32 로 덮어썼다 (`2E498428…` → `B840E7A7…`)
+   → `P3/preds/_backup_pre_maskfix/` golden 으로 바이트 복구. `final` 은 임시 폴더 전용으로 봉인.
+3. `save_pool_pred` 의 `astype(float32)` 강제 캐스팅이 P2·P3 golden(float64)의 재현을 원천 차단했다
+   → 캐스팅 제거, 정밀도 보존.
+
+백업은 `ocean-snapshot` 스킬 (`TaeYoungLim1901/OCEAN`, private). 저장소를 새로 만들지 마라.
+
+미해결 1건: **P2·P3 의 데이터 해시 대장이 `P{n}/cache/` 라 gitignore 대상이다.**
+P1 처럼 트리 루트(`P1/data_hashes.json`)로 옮겨야 클론에서 데이터 무결성 검증이 된다.
+
 ## 제출 직전과 직후
 
 ```powershell

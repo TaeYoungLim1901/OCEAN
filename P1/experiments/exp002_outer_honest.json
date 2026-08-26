@@ -1,0 +1,13 @@
+{
+  "outer_f1_honest": 0.7664233576642335,
+  "tp": 4935,
+  "fp": 500,
+  "fn": 2508,
+  "train_rows": 574188,
+  "outer_rows": 194170,
+  "params_locked": {
+    "weight": 0.15,
+    "threshold": 0.44,
+    "hole": 2
+  }
+}

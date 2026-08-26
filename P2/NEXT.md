@@ -1,5 +1,31 @@
 # P2 재개 지점 (2026-08-25 세션 종료)
 
+## 세션 시작 게이트 (2026-08-26 확정)
+
+착수 전 2줄. 실패하면 실험하지 말고 원인부터 고친다. **검사를 완화하지 마라.**
+
+```powershell
+python P2/src/bugcheck.py all                    # 판정: OK 여야 한다
+python scripts/g.py --p P2 check "<키워드>"       # exit 1 이면 닫힌 축
+```
+
+제출 후보를 확정했을 때:
+
+```powershell
+python P2/src/submission_tools.py audit <제출csv> --pred <예측npy>   # --pred 는 필수다
+python P2/src/check.py final <제출csv>                              # 빈 폴더 바이트 재현 + manifest
+```
+
+**모델 제출 직전에만** (세 문제 후보가 전부 정해졌을 때. 1회 확정이라 복구 불가):
+
+```powershell
+python scripts/preflight.py final --p1 <P1csv> --p2 <P2csv> --p3 <P3csv>
+```
+
+2026-08-26 기준 세 문제 `bugcheck all` 전부 `판정: OK`, 전역 장벽 `판정: READY`.
+마감·잔여 제출 횟수는 세션 시작 훅이 출력한다 (`.claude/hooks/ocean_context.py`).
+규정 수치를 문서·graph 에 복사하지 마라 — `python scripts/preflight.py rules` 가 잡는다.
+
 이전 세션 원문은 `P2/experiments/NEXT_2026-08-25_archive.md`.
 지식은 `python scripts/g.py --p P2 show <노드>`, 실험 이력은 `P2/experiments/log.md`.
 
