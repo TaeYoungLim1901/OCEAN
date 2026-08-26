@@ -31,7 +31,7 @@ def sha256(path):
 
 
 def save_pool_pred(path, values):
-    """Validate and save a continuous prediction pool as float32."""
+    """Validate and save a continuous prediction pool preserving its dtype."""
     path = pathlib.Path(path)
     values = np.asarray(values)
     if not np.issubdtype(values.dtype, np.floating):
@@ -41,7 +41,7 @@ def save_pool_pred(path, values):
     if np.unique(values).size < 3:
         raise ValueError("prediction pool must have at least 3 unique values")
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(path, values.astype(np.float32))
+    np.save(path, values)
     return path
 
 

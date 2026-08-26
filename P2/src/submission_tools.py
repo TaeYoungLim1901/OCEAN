@@ -35,11 +35,8 @@ def save_pool_pred(path, values):
         raise ValueError("pool 예측에 비유한값이 있습니다")
     if np.unique(values).size < 3:
         raise ValueError("pool 예측은 고유값이 3개 이상이어야 합니다")
-    stored = values.astype(np.float32)
-    if not np.isfinite(stored).all():
-        raise ValueError("float32 변환 후 비유한값이 있습니다")
-    np.save(path, stored)
-    return stored
+    np.save(path, values)
+    return values
 
 
 def sha256(path):

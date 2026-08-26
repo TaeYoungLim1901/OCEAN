@@ -51,8 +51,9 @@ description: OCEAN 작업 트리를 개인 private GitHub 저장소 TaeYoungLim1
    정확히 그 private 저장소가 아니면 즉시 멈춘다. origin 의 fetch/push URL 이 다르거나
    브랜치가 `main` 이 아니면 멈춘다.
 3. **`git add .` 를 쓰지 마라.** 아래 경로만 `git add -A -- <경로>` 로 명시 스테이징한다:
-   `.gitignore`, `.claude`, `docs`, `scripts`, 루트 운영 Markdown,
-   그리고 각 문제의 `AGENTS.md`, `graph.json`, `src`, `specs`,
+   `.gitignore`, `.claude`, `docs`, `scripts`, 루트 `*.md` (공고문 원문 포함),
+   그리고 각 문제의 최상위 `*.md` (`AGENTS.md`·`NEXT.md`·`*CONTEXT.md`·`*_RESEARCH.md` 등),
+   `graph.json`, `src`, `specs`,
    `P1/experiments/log.md`·`P1/experiments/public_scores.csv` (P2·P3 동형).
 4. 커밋 전 스테이징된 파일 이름과 바이트를 전부 출력한다. 다음이 하나라도 있으면 커밋하지 말고 멈춘다:
    데이터·cache·models·preds·subs·codex 실행 로그, `.env`/`.pem`/`.key`,

@@ -34,9 +34,9 @@ def main():
               for i, (cid, station, _) in cases.iterrows()
               for j, lead in enumerate(C.LEADS)}
     index = pd.read_csv(C.DATA / "test_index.csv")
-    index["hs_pred"] = [values[tuple(row)] for row in index.itertuples(index=False, name=None)]
+    index["hs_pred"] = [str(float(values[tuple(row)])) for row in index.itertuples(index=False, name=None)]
     out = P3 / "subs" / "submission_p3_t1f.csv"
-    index.to_csv(out, index=False)
+    index.to_csv(out, index=False, lineterminator="\r\n")
     print(f"submission={out} rows={len(index)} weight_lgbm={WEIGHT_LGBM:.2f}")
 
 

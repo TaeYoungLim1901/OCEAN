@@ -343,6 +343,12 @@
       "type": "fact",
       "t": "격리: score_oof_V1.npy C4ED60F0, score_oof_V2.npy 3880AA29, score_oof_V3.npy 08B452B8; 원천 연속 raw score 부재로 quarantine 이동, ensemble/submission 경로 제외",
       "src": "P1/specs/T19-p1-guards.md T19-3"
+    },
+    {
+      "id": "g.r5_dtype",
+      "type": "gate",
+      "t": "R5 저장 dtype 보존 및 final 재현 통과: CSV 4C96D5F38B, NPY float32 (169011,), preflight READY",
+      "src": "P1/specs/R5-repro-dtype.md"
     }
   ],
   "edges": [

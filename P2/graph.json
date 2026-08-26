@@ -296,6 +296,12 @@
       "type": "gate",
       "t": "E017 결함 제거·예측 저장 fail-closed·빈 폴더 재현 manifest",
       "src": "E017"
+    },
+    {
+      "id": "g.r5_dtype",
+      "type": "gate",
+      "t": "R5 저장 dtype 보존 및 final 재현 통과: CSV F88AC4BF12, NPY float64 (26061,), pred_bytes_match=True",
+      "src": "P1/specs/R5-repro-dtype.md"
     }
   ],
   "edges": [

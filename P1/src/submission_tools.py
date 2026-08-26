@@ -35,12 +35,9 @@ def save_pool_pred(path, values):
             or np.any((values < 0) | (values > 1))
             or np.unique(values).size < 3):
         raise ValueError("pool prediction must be finite floating scores in [0,1] with >=3 unique values")
-    stored = values.astype(np.float32)
-    if np.unique(stored).size < 3:
-        raise ValueError("pool prediction loses score resolution in float32")
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(path, stored)
+    np.save(path, values)
 
 
 def audit(path, pred, canonical=None, baseline=None, log_path=AUDITS, use_check=True):
