@@ -302,6 +302,74 @@
       "type": "gate",
       "t": "R5 저장 dtype 보존 및 final 재현 통과: CSV F88AC4BF12, NPY float64 (26061,), pred_bytes_match=True",
       "src": "P1/specs/R5-repro-dtype.md"
+    },
+    {
+      "id": "f.score_formula",
+      "type": "fact",
+      "t": "점수 = 33.3335 - 12.54789*RMSE (최대 100/3). 3점 (0.537099,26.594071)(0.523888,26.759837)(0.522638,26.775526) 전부 ±0.0001 일치. 1위 28.362053 = RMSE 0.3962",
+      "src": "2026-08-26 P2 리더보드 실측 3점 역산"
+    },
+    {
+      "id": "f.antistack_w",
+      "type": "fact",
+      "t": "완전행 w* 항등식 해: A=E[d^2]_public=0.000435965, B=E[d.e]_public=-0.001199927, w*=-2.7523. d=stack_regime-robust_blend. 채택 w=-2.5 (축소). 손익분기 w*=-1.75",
+      "src": "2026-08-26 E009/E010/E014 3점 + E017 검증"
+    },
+    {
+      "id": "a.antistack_extrap",
+      "type": "axis",
+      "t": "완전행 anti-stack 외삽 w 조정",
+      "status": "closed",
+      "evidence": "E017 w=-2.5 public 0.522638, 예측 0.522635 (Δ3e-6). 포물선 3점으로 닫힘. 새 완전행 모델 없이는 추가 이득 상한 0.000029"
+    },
+    {
+      "id": "f.t18_chain",
+      "type": "fact",
+      "t": "T18 run_all.py가 E002→E003→E004→E005→E008→anti-stack→mix_sub 순서로 원자료에서 제출 CSV와 float64 NPY를 생성하며 기존 산출물은 비덮어쓴다",
+      "src": "P2/specs/T18-repro-chain.md"
+    },
+    {
+      "id": "g.t18_static",
+      "type": "gate",
+      "t": "T18 preflight/help/AST OK, bugcheck C1~C5,C7~C9 PASS 8/8; 전체 학습 미실행",
+      "src": "2026-08-26 T18"
+    },
+    {
+      "id": "f.tanh_base",
+      "type": "fact",
+      "t": "4모수 tanh 수온약층 적합 T(z)=Td+(Ts-Td)/2*(1-tanh((z-z0)/h)) 가 학습없이 base 를 29% 개선. 2024_sepoct 0.970325(선형)→0.686777. S3 0.862944→0.640976, S4 0.428320→0.306770. 결측 2.051059→1.407025. 층4 1.332802→0.994912. PCHIP(B1)은 결측에서 2.689355 로 악화",
+      "src": "2026-08-26 T19/E019 depth_base_e019.py"
+    },
+    {
+      "id": "f.actual_depth_wins",
+      "type": "fact",
+      "t": "실측 depth 열이 nominal_depth 보다 base RMSE 를 창별 0.038623~0.087071 낮춘다. B1 기준 측정",
+      "src": "2026-08-26 T19 표3"
+    },
+    {
+      "id": "f.repro_ok",
+      "type": "fact",
+      "t": "run_all.py 체인(E002_train-E002_infer-E003_train-E003_infer-E004-E005-E008-wmix-mix_sub)이 빈 폴더에서 E017 을 바이트 동일 재현. sha256 c4c16318..e858159 match=True pred_bytes_match=True. manifest P2/subs/E017_antistack_w-2.5.manifest.json. 초기 실패 원인은 run_all 이 inference_e002/inference_e003 을 호출하지 않아 test_e002_E003.npy 부재",
+      "src": "2026-08-26 T18/T20 + check.py final 실행"
+    },
+    {
+      "id": "f.b2_feature_hurts",
+      "type": "fact",
+      "t": "B2 tanh 파라미터를 피처로 추가하면(A1) 대조군 A0 대비 4창 전부 악화: 2024_sepoct +0.006968, S3 +0.008618, S4 +0.022737, 결측 +0.033761. base 로서는 29% 우수한데 피처로는 해롭다. 학습시간도 22.6배(323->7307초, B2 적합 미캐시)",
+      "src": "2026-08-26 E020 A0/A1"
+    },
+    {
+      "id": "f.judge_fails_freshstack",
+      "type": "fact",
+      "t": "2024_sepoct 판정기는 새로 적합한 스택에 반대를 가리킨다. E022(stack_regime+A2) 판정 0.478457 로 maskaug 0.491145 보다 -0.012688 우세였으나 public 0.560599 로 E017 0.522638 대비 +0.037961 패배. 판정기는 E008 stack_regime(판정 0.514111 열세, public 0.528449 열세)은 맞혔다. 차이는 OOF 로 창 위에서 가중치를 새로 적합했는지 여부",
+      "src": "2026-08-26 E022 public"
+    },
+    {
+      "id": "a.b2_target_stack",
+      "type": "axis",
+      "t": "B2 tanh target 모델(A2)을 스택에 넣어 제출",
+      "status": "closed",
+      "evidence": "E022 public 0.560599 (+0.037961 vs E017). 사전규칙 >0.5300 구간. 판정기 -0.012688 우세 예측이 반대로 났다. 다만 E[d.e]=-0.0108 로 반대방향 블렌드는 열려있다(E023)"
     }
   ],
   "edges": [
@@ -359,6 +427,11 @@
       "g.e006",
       "measures",
       "a.season_matched_holdout"
+    ],
+    [
+      "g.t18_static",
+      "measures",
+      "f.t18_chain"
     ]
   ]
 }

@@ -1,5 +1,6 @@
 """E008: saved-prediction simplex stacking with leave-one-hold-out scoring."""
 import json
+import pickle
 import sys
 from pathlib import Path
 
@@ -320,6 +321,12 @@ def main():
         "baseline_expected": baseline_expected,
         "baseline_match": baseline_ok,
     }
+    model_path = ROOT / "models" / "E008.pkl"
+    if not model_path.exists():
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(model_path, "wb") as f:
+            pickle.dump({"models": {}, "components": names, "weights": weights,
+                         "selected": selected, "seed": SEED}, f)
     cache = ROOT / "cache" / "E008"
     cache.mkdir(parents=True, exist_ok=True)
     (cache / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -1,138 +1,105 @@
-# P1 재개 지점 — 2026-08-26
+# P1 재개 지점 — 2026-08-26 (2차 세션 종료)
 
-## 세션 시작 게이트 (2026-08-26 확정)
-
-착수 전 2줄. 실패하면 실험하지 말고 원인부터 고친다. **검사를 완화하지 마라.**
+## 세션 시작 게이트
 
 ```powershell
-python P1/src/bugcheck.py all                    # 판정: OK 여야 한다
+python P1/src/bugcheck.py all                    # 판정: OK 여야 한다 (2~3분)
 python scripts/g.py --p P1 check "<키워드>"       # exit 1 이면 닫힌 축
 ```
 
-제출 후보를 확정했을 때:
-
-```powershell
-python P1/src/submission_tools.py audit <제출csv> --pred <예측npy>   # --pred 는 필수다
-python P1/src/check.py final <제출csv>                              # 빈 폴더 바이트 재현 + manifest
-```
-
-**모델 제출 직전에만** (세 문제 후보가 전부 정해졌을 때. 1회 확정이라 복구 불가):
-
-```powershell
-python scripts/preflight.py final --p1 <P1csv> --p2 <P2csv> --p3 <P3csv>
-```
-
-2026-08-26 기준 세 문제 `bugcheck all` 전부 `판정: OK`, 전역 장벽 `판정: READY`.
-마감·잔여 제출 횟수는 세션 시작 훅이 출력한다 (`.claude/hooks/ocean_context.py`).
-규정 수치를 문서·graph 에 복사하지 마라 — `python scripts/preflight.py rules` 가 잡는다.
+제출 후보 확정 시: `python P1/src/submission_tools.py audit <csv> --pred <npy>`
+(`check.py final` 은 exp002 전용 하드코딩이라 쓰지 마라.)
 
 ## 현재 성적
 
 | 항목 | 값 |
 |---|---|
-| **최고 제출** | `P1/subs/exp010.csv` — public F1 **0.741274** / **26.456883점** |
-| sha256 | `59D97691CE3E41408DA76D003CA5FB9DCDE9C0BC0A09ADBA47196E8AC413A769` |
-| 설정 | exp005 파이프라인 + `t_high 0.775` / `hole 48` / dilation 0 / min-length 0 |
-| 8/25 순이득 | +0.633606 (25.823277 → 26.456883). **재학습 0회, 임계 재조정만** |
-| 1위(ChangCv)와 격차 | F1 기준 **+0.117** (0.858 추정) |
+| **최고 제출** | `P1/subs/exp016.csv` — public F1 **0.776056** / **27.381306점** |
+| sha256 | `B03A5E9C39DC2ADC4BE983166371195779E895E1A4F3EFFE63D924F88552158A` |
+| 설정 | base 42 + 이웃 회귀 잔차 `n1`,`n2_432`,`n3`,`n4` = 46 feature / `t_high 0.737` / `hole 48` / 양성 5070 (2.9998%) |
+| 8/26 순이득 | +0.034782 (26.456883 → 27.381306). exp010 → exp016 |
+| 1위 | 30.885889 (F1 환산 ≈ 0.906). 격차 F1 **0.130** |
+| 점수 산식 | `점수 = 26.58 × F1 + 6.754` (관측 6점 오차 0.02 이내. exp013 만 이탈 — 분할 붕괴) |
 
-## Public 제출 대장 (`python P1/src/submission_tools.py public list`)
+## 즉시 할 일 — 내일 슬롯 3개
 
-| 실험 | 양성률 | public F1 |
-|---|---|---|
-| exp011 | 2.1602% | 0.657820 |
-| **exp010** | **2.9832%** | **0.741274** |
-| exp005 | 3.4791% | 0.717435 |
-| exp009 | 4.1808% | 0.698524 |
+1. **exp019 제출** — `P1/subs/exp019.csv` (49 feature, 양성 5063, sha `221011B2E2…`).
+   판정기에서 유일하게 exp016 을 이겼다 (auc_all 0.936068 vs 0.932374, drift 0.913054 vs 0.899629).
+   **제출 전 R1 후처리 적용**: 길이 2~11 run 삭제 (`P1/src/t32_postproc.py` 재사용, 길이 1 은 보존).
+2. **양성률 프로브** — exp019 원시확률을 **3.6%** 로 재임계. 근거: exp016 역산 정밀도 0.923 / 재현율 0.669
+   (test 양성 4.14% 가정) = 과소예측. 봉우리 3.0191% 는 F1 0.74 짜리 구모델 4점으로 적합한 값이다.
+3. **T33 결과물** — 아래 착수분 결과에 따라. 없으면 exp016+exp019+exp014 랭크 평균 앙상블.
+
+## 판정기 — 슬롯 없이 거른다
+
+```powershell
+python P1/src/t26_judge.py fit <variant>   # 학습 2024년 279,185행 purge 87h, 검증 2025-01~06
+python P1/src/t27_judge_fix.py             # K1(auc) K2(rank F1) K3(public 상관)
+```
+
+**지표는 `auc_all` 만 본다.** `judge_F1` 은 public 과 Spearman −0.8 이다.
+**유효 범위: 같은 학습 행에서 feature·하이퍼파라미터만 바꾼 비교** (`f.judge_scope`).
+학습 행을 바꾸는 변형에는 쓰지 마라 (season42 를 2위로 놓았는데 public 은 최하위였다).
+
+현재 값: standardized49 **0.936068** > neighbor46 0.932374 > hp_leaves127 0.929112 >
+hp_trees1400 0.927216 > season42 0.923480 > hp_posweight1 0.923437 > base42 0.915129 >
+invariant37 0.906768 > integrated47 0.897338.
+
+## 다음 레버 — 우선순위
+
+1. **G-ORS 구멍** (착수 예정 T33). G-ORS 는 층이 1개라 `n1`·`s1`·`s2`·`s8_432` 가 전부 NaN 이다.
+   **test 행의 9.7%(16,331행)가 이웃 신호 0으로 판정된다.** 기지간(같은 층 번호, 다른 기지) robust 회귀
+   잔차 `g1`·`g3` 로 덮는다. Q3-B 에서 중앙값 기반 거친 버전 `y4` 의 S-ORS offset AUC 가 0.896873 였다.
+2. **양성률 재탐색** (위 슬롯 2).
+3. **구간 2단계 재설계** — T22 는 오라클 상한 0.555 로 접었지만 원인이 **경계 해상도**임이 밝혀졌다
+   (offset IoU p50 0.9746 / drift 0.3611 / noise 0.0708). 경계를 `n1`·`s1` 기반으로 다시 뽑으면 상한이 오른다.
+4. 앙상블 — `exp015`(랭크 평균) 코드가 `P1/src/exp013_shift.py ensemble` 에 있다.
 
 ## 확정된 판정 원칙 — 어기지 마라
 
-1. **`a.threshold_rate` 축 폐쇄.** 양성률-public 곡선 2차 적합 봉우리 **3.0191%**, peak F1 **0.741420**.
-   exp010 은 최적에서 **0.000146** 이내다. 임계만 더 만져서 얻을 여지는 0.0002 미만 — 슬롯 쓰지 마라.
-   곡선은 **비대칭**이다 (아래로 −0.0835, 위로 −0.0238). 새 모델 임계는 **3.0% 보다 살짝 위**에서 잡는다.
-2. **inner 는 후처리·임계 판정기가 아니다** (`f.inner_delta_no_transfer`).
-   exp009 는 inner +0.004606 인데 public **−0.018911** 로 부호가 뒤집혔다.
-   후처리 격자 argmax 를 inner 로 고르지 마라. 유효 표본이 행이 아니라 **세그먼트**(offset 17·drift 12·noise 34)다.
-   단 **후처리를 고정한 채 모델만 비교**하는 용도로는 쓴다 (exp005 inner 0.6978 → public 0.7174, 오프셋 안정).
-3. **사전 판정 규칙을 결과 보기 전에 `log.md` 에 적는다.** 8/25 에 두 번 값을 했다 —
-   exp009 를 승격선 0.702836 으로 걸렀고(실제 −0.0189), exp011 분기 예측도 맞혔다.
-4. 봉인 fold3 는 **이미 3회 판독됐다.** 채점하지 마라.
-
-## 다음 수 — 이 순서
-
-### 1. P1 결함 2건 수정 (최우선. 안 고치면 다음 학습이 오염된다)
-
-- **C1 지뢰**: `P1/src/features.py::train_mask_with_purge` 가 **대칭 purge 마스크**다.
-  `bugcheck C1` 이 4 fold 합계 `future_rows=1,140,222` 로 잡았다. exp004 를 오염시킨 그 버그.
-  수정: `keep = folds < held_out` + station-layer 별 `time < validation_start − 87h`.
-  함수 내부에 `keep & (folds >= held_out)` 가 0 인지 **assert**.
-  수락: `python P1/src/bugcheck.py C1` → `future_rows=0 mask_differences=0`
-- **C4 이진화**: `P1/preds/oof|test_exp002~005.npy` 가 전부 **uint8 0/1**. 앙상블 재조합이 원천 불가였고
-  임계 프로브 1건을 날렸다. 원시 확률은 `P1/cache/exp005_raw_{oof,test}.npy` 에 살아 있다.
-  수정: `save_pool_pred(path, values)` 를 `submission_tools.py` 에 추가 — 저장 전 floating dtype·유한·[0,1]·
-  고유값 3개 이상 검사 후 float32 저장, 위반 시 **저장하지 않고 예외**. `astype(float32)` 위장 금지.
-  수락: `python P1/src/bugcheck.py C4` → `binary_uint8=0`
-- 그 뒤 `python P1/src/bugcheck.py all` 의 C3(`config_issues=1`)·C8(`recorded_files=0`) 원인 제거.
-  **검사를 완화해서 통과시키지 마라.**
-
-### 2. V1 full-train + 제출 (오늘 슬롯 1번)
-
-`f.v1_wins`: 후처리 exp005 고정(t 0.62 / hole 48) 기준 inner F1 —
-
-| 변형 | feature | 트리 | inner F1 |
-|---|---|---|---|
-| exp005 | 42 | 700 | 0.697836 |
-| **V1** | **47** | 700 | **0.702859** |
-| V2 | 54 | 700 | 0.587059 |
-| V3 | 81 | 1400 | 0.551970 |
-
-**개수 절벽이다.** 5개는 이득, 12개는 붕괴, 트리 2배로도 복구 불가.
-V1 이 고른 5개 — `temp_step_abs_144`, `max_z_center_144`, `temp_step_144`, `temp_step_abs_48`, `psal_step_abs_144`.
-**전부 step 검출기 계열**로 T10 의 offset 진단과 일치한다.
-
-**V1 은 inner OOF 만 있고 test 예측이 없다.** 해야 할 것:
-전체 train 단일 모델 학습 → 원시 확률 **float 저장** → **양성률 3.0% 로 재임계** → 제출.
-`t 0.62` 그대로 내면 양성률이 3.5% 근처가 되어 exp010 보다 나쁘다.
-코드는 `P1/src/exp007_postmortem.py` 재사용. 학습은 사람이 실행 (`AGENTS.md` 예외 3).
-
-### 3. 남은 미탐
-
-T10(`P1/experiments/exp006_fn_decomp.json`): inner FN 6038 중 **offset 2156(recall 0.4254) + drift 1689(0.5104) = 63.7%**.
-offset 세그먼트 17개 중 full_miss 8, 구간내 적중률 p50 **0.0083**.
-drift 는 구간내 10분위 recall **0.2393 → 0.7361 단조 증가**.
-flatline(0.894)·spike 는 건드리지 마라. **step feature 를 더 좁게 파는 것이 유일하게 열린 큰 레버다.**
+1. **AUC 는 전이되고 F1 은 전이되지 않는다** (`f.neighbor_wins`, `f.judge_scope`).
+   새 feature 는 Q 계열 AUC 스크리닝 → 판정기 `auc_all` 순으로 거른다. 슬롯을 스크리닝에 쓰지 마라.
+2. **inner(fold1·2)는 어떤 승격 판정에도 쓰지 않는다** (`f.inner_delta_no_transfer`, `f.inner_not_model_judge`).
+   임계·후처리·모델 비교 세 번 다 부호가 뒤집혔다.
+3. **사전 판정 규칙을 결과 보기 전에 `log.md` 에 적는다.** 8/26 에 exp012·exp013 을 사전 기준으로 정확히 기각했다.
+4. 봉인 fold3 는 판독하지 마라.
+5. 확률 저장은 `booster.predict` 다. `LGBMClassifier.predict()` 는 0/1 라벨을 준다 (`f.judge_proba_bug`).
 
 ## 닫힌 축 — 재제안 금지
 
-`a.threshold_rate`(양성률 곡선으로 폐쇄) · `a.rate_anchoring`(train 4.1362% 정합이 최악) ·
-`a.type_multiclass` · `a.random_rows` · `a.adversarial_drift` · hysteresis(exp009 public −0.0189) ·
-min-length L=12(spike recall 0.686→0.059) · 적분 feature 12개 이상(V2·V3 붕괴).
+`a.threshold_rate`(구모델 기준. **모델이 바뀌면 재개 가능** — 위 슬롯 2) · `a.rate_anchoring` ·
+`a.integrated_features`(exp012 public −0.023299) · `a.season_matched`(exp013 −0.158797) ·
+`a.hyperparams`(판정기 3종 전부 하락) · `a.type_multiclass` · `a.random_rows` · `a.adversarial_drift` ·
+hysteresis(exp009 −0.018911) · min-length L=12(spike recall 붕괴. **길이 2~11 만 지우는 R1 은 유효**).
 
-## 구조 반영 — `docs/PORT-PLAN-2026-08-25.md` v3 (sol 적대검토 반영)
+## 문제지에서 나온 하드 사전
 
-**새 문서를 만들지 않는다.** 사고는 `graph.json` 의 `f.incident_*`, 예방은 `g.*` gate 노드,
-실행은 `bugcheck`/`check.py` exit code. 게이트를 못 붙이는 개선항목은 계약 문서에 넣지 마라 — 죽는다.
+- 주입 지속시간: spike 1행, noise 18~353, flatline 12~283, offset 48~519, drift 54~519.
+  train 라벨 run 263개 실측 — **길이 2~11 이 0개, 520+ 도 0개** (`r.duration_prior`).
+- 이상은 원자료 품질플래그 good_data 구간에만 주입. 유효 관측의 약 4%.
+- 층간 상관은 조석 혼합기엔 유효하나 **수온약층 발달기엔 소실**. test 는 2026-01~06 (겨울→봄 성층 전이).
+- **정점·층 단위 표준화 지표가 전 구간 공통 임계보다 안정적**이라고 문제지가 명시 (s1·s2 가 이걸 구현했고 이겼다).
+- G-ORS 2026 depth 전부 결측, I-ORS 2026 층 3 미운영, S-ORS 2025년 9~10월 층 2·3·4 는 P2 보호로 제외.
+- 규칙 베이스라인 전체 F1 0.548255. 종합점수는 **각 리더보드 분할에서 베이스라인을 재채점** → 분할이 여러 개다.
 
-미반영 순서: 1(A `cx.sh` 재귀 가드, root) · 2(`rules_runtime.py` + D 훅, root) ·
-**3·4(P1 C1·C4 수정 — 위 참조)** · 5(bugcheck all 정리) · 6(B `--pred` fail-closed) ·
-7(`preflight.py rules`) · 8(빈 폴더 최종 재현 + manifest) · **9(세 문제 전역 READY 장벽, root)**.
+## 오늘 제출 대장
 
-**순서 9 가 가장 비싼 실패를 막는다** — 한 터미널의 조기 모델 제출이 세 문제 전부의 답안 업로드를 끝낸다.
-전역 ready 상태가 없고 1회 확정이며 복구 불가다.
+| 실험 | 양성률 | public F1 | 점수 |
+|---|---|---|---|
+| **exp016** | 2.9998% | **0.776056** | **27.381306** |
+| exp010 | 2.9832% | 0.741274 | 26.456883 |
+| exp012 | 3.0501% | 0.717975 | 25.837638 |
+| exp005 | 3.4791% | 0.717435 | 25.823277 |
+| exp009 | 4.1808% | 0.698524 | 25.320658 |
+| exp011 | 2.1602% | 0.657820 | 24.238822 |
+| exp013 | 2.9874% | 0.582477 | 11.455269 |
 
-## 규정 (`RULES.md` 통합본, sol 검토 후 14건 수정 완료)
-
-- 답안 제출 제한: **`RULES.md` §0 참조**. 슬롯 이월 없음
-- 예선 마감: **`RULES.md` §0 참조** (자정 아님)
-- **모델 제출 시 즉시 최종 확정** — 이후 답안 업로드 불가. 맨 마지막에 낸다
-- 운영진이 **제출 모델의 답안 재현을 검증**한다. 실패 = 최종 성적 미인정.
-  후처리(임계·hole fill)가 모델 산출물인지는 **명시 없음** → 모든 후처리를 추론 코드 안에 결정론적으로 넣어라
-- 외부 데이터 사용 가능(평가는 대회 데이터로만). **안 쓴다** — 격차는 climatology 품질이 아니다
-- 남은 슬롯은 **`RULES.md` §0와 public ledger로 계산**
+미제출 대기: `exp014`(37f, `BE5183376F`) · `exp019`(49f, `221011B2E2`) · `exp020`(exp016+R1, `5F16F7FCF5`).
 
 ## 위임
 
-- 구현: `scripts\cx.cmd P1/specs/T{n}.md` (codex `gpt-5.6-luna` xhigh)
-- 조사·웹검색: `scripts\gk.cmd P1/specs/Q{n}.md` (grok-4.6, 읽기 전용)
-- 적대검토: `codex exec --model gpt-5.6-sol -c model_reasoning_effort=xhigh --sandbox read-only`
-- 전부 `dangerouslyDisableSandbox: true` + `run_in_background: true`, 로그는 `P1/experiments/logs/`
+- 구현: `bash scripts/cx.sh P1/specs/T{n}.md` — **`scripts\cx.cmd` 는 Bash 도구에서 깨진다.**
+  `dangerouslyDisableSandbox: true` + `run_in_background: true`, 로그는 `P1/experiments/logs/`.
+- 사양은 `python scripts/preflight.py spec <사양>` 이 `판정: OK` 여야 한다.
+  자주 걸리는 것: `기준선 숫자`, `pip install 정지 지시`, `배경(재조사 금지)`, 경로는 `P1/cache/` 처럼 접두사 포함.
+- 긴 학습은 사람이 돌린다. codex 는 코드만 만든다.

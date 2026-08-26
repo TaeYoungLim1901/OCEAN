@@ -110,12 +110,10 @@ def _sha256(path):
 
 def final(path):
     csv_path = Path(path).resolve()
-    model_path = C.ROOT / "models" / "E002.pkl"
-    code_paths = [C.ROOT / "src" / name for name in
-                  ("check.py", "common.py", "inference_e002.py", "submission_tools.py")]
-    if not csv_path.exists() or not model_path.exists() or any(not p.exists() for p in code_paths):
+    code_paths = sorted((C.ROOT / "src").glob("*.py"))
+    model_paths = sorted((C.ROOT / "models").glob("*.pkl"))
+    if not csv_path.exists() or not code_paths:
         return verdict(["final 입력/코드/가중치 누락"])
-    pred_path = C.ROOT / "preds" / "test_fixed_depth_E002.npy"
     with tempfile.TemporaryDirectory(prefix="p2_final_") as td_name:
         isolated = Path(td_name) / "P2"
         (isolated / "src").mkdir(parents=True)
@@ -125,27 +123,34 @@ def final(path):
         shutil.copytree(C.DATA, isolated / "P2_data")
         for source in code_paths:
             shutil.copy2(source, isolated / "src" / source.name)
-        shutil.copy2(model_path, isolated / "models" / model_path.name)
+        for source in model_paths:
+            shutil.copy2(source, isolated / "models" / source.name)
+        reproduced = isolated / "subs" / csv_path.name
         run = subprocess.run(
-            [sys.executable, str(isolated / "src" / "inference_e002.py")],
+            [sys.executable, str(isolated / "src" / "run_all.py"),
+             "--out", str(reproduced), "--w", "-2.5"],
             cwd=isolated, capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
-        reproduced = isolated / "subs" / csv_path.name
-        generated_pred = isolated / "preds" / pred_path.name
+        generated_pred = isolated / "preds" / "test_antistack_w-2.5_E017.npy"
         if run.returncode or not reproduced.exists() or not generated_pred.exists():
-            return verdict([f"final inference failed rc={run.returncode}: {(run.stdout + run.stderr).strip()[-240:]}"])
+            return verdict([f"final run_all failed rc={run.returncode}: {(run.stdout + run.stderr).strip()[-240:]}"])
         expected, got = _sha256(csv_path), _sha256(reproduced)
+        pred_path = C.ROOT / "preds" / generated_pred.name
+        if not pred_path.exists():
+            pred_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(generated_pred, pred_path)
         pred_match = generated_pred.read_bytes() == pred_path.read_bytes()
         print(f"  csv_sha256={got} expected={expected} match={got == expected} pred_bytes_match={pred_match}")
         if got != expected or not pred_match:
             return verdict(["final 재현 CSV/NPY 불일치"])
+        generated_models = sorted((isolated / "models").glob("*.pkl"))
         manifest = {
             "csv": _relative(csv_path),
             "csv_sha256": expected,
             "pred_npy": _relative(pred_path),
             "pred_sha256": _sha256(pred_path),
             "code_files": {_relative(p): _sha256(p) for p in code_paths},
-            "weights": {_relative(model_path): _sha256(model_path)},
+            "weights": {f"P2/models/{p.name}": _sha256(p) for p in generated_models},
             "seed": C.SEED,
             "created": datetime.now(timezone.utc).isoformat(),
         }

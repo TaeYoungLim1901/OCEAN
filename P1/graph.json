@@ -349,6 +349,141 @@
       "type": "gate",
       "t": "R5 저장 dtype 보존 및 final 재현 통과: CSV 4C96D5F38B, NPY float32 (169011,), preflight READY",
       "src": "P1/specs/R5-repro-dtype.md"
+    },
+    {
+      "id": "f.q2_cross_layer",
+      "type": "fact",
+      "t": "층간 단면 잔차 측정(Q2). 형제 층 동시 주입 겹침 p50=0.0 (상쇄 없음). 행 AUC — offset: resid_1009 0.871, clim_resid 0.855, x4 0.806, y4 0.840(NaN 61%); drift: x5 0.822, x4 0.807, resid_1009 0.806. 단면 신호는 단독으로 기존 기준선을 못 이긴다. 단 x4-resid_1009 Spearman 0.194, x4-clim_resid 0.112 로 비상관 = 보완 가치. 층 구성 G-ORS 1층(단면 불가, test 9.7%), I-ORS 7, S-ORS 8",
+      "src": "P1/experiments/logs/q2_out.log"
+    },
+    {
+      "id": "a.segment_two_stage",
+      "type": "axis",
+      "t": "변화점 후보 구간 + 구간 feature 분류기 2단계. 채택 구간의 행 전체를 켠다. 행 확률과 max 합성. offset 구간 내부 적중률 p50 0.0083 이라 행 확률 집계로는 회수 불가",
+      "src": "P1/specs/T22-segment-detector.md",
+      "status": "open"
+    },
+    {
+      "id": "f.inner_not_model_judge",
+      "type": "fact",
+      "t": "inner(fold1·2)는 후처리 고정 조건의 **모델 비교로도** public 에 부호가 전이되지 않는다. V1(47 feature, 적분 step 5개 추가) inner +0.005023 인데 public −0.023299 (exp012 0.717975 vs exp010 0.741274). 양성률은 3.0501% vs 2.9832% 로 곡선 봉우리 3.0191% 양쪽 0.03%p 이내라 임계로 설명 불가. 2024~25 적합 step feature 가 2026 에 전이되지 않는다. inner 는 이제 어떤 승격 판정에도 쓰지 않는다",
+      "src": "P1/experiments/log.md"
+    },
+    {
+      "id": "a.integrated_features",
+      "type": "axis",
+      "t": "climatology 잔차 다중창 z-score·robust step·rolling slope 등 적분 feature 를 행 모델에 추가",
+      "src": "P1/experiments/log.md",
+      "status": "closed",
+      "evidence": "exp007(39개) inner 0.577092 붕괴. V1(5개) inner +0.005023 이었으나 exp012 public 0.717975 = exp010 대비 -0.023299. 양성률 3.05% 로 봉우리 근처였는데도 졌다. 제출 경로 폐쇄"
+    },
+    {
+      "id": "f.neighbor_residual",
+      "type": "fact",
+      "t": "이웃 층 robust 회귀 잔차(Q3)가 기존 최고 신호를 offset·drift 양쪽에서 이긴다. 행 AUC — n1: offset 0.903359 drift 0.852175 noise 0.787195; n4=slope(n1,144): drift 0.894243; n3=mean(n1,36)-mean(n1,432): offset 0.861343 drift 0.860194. 기존 최고 resid_1009 offset 0.871459 drift 0.806467. 직교성 n1-resid_1009 Spearman 0.389, n3-resid_1009 0.207. 주의: 계수 연도 안정성 불균일(S-ORS 층별 2024vs2025 cos 0.98~-0.01), 이웃 결측 대체 비율 최대 0.3612, G-ORS 는 이웃 없음(test 9.7%)",
+      "src": "P1/experiments/logs/q3_out.log"
+    },
+    {
+      "id": "a.neighbor_regression",
+      "type": "axis",
+      "t": "같은 기지 다른 층 temp 로 robust 회귀해 얻은 잔차와 그 상대형(n3 n4)을 행 모델 feature 로 추가",
+      "src": "P1/specs/T24-neighbor-features.md",
+      "status": "open"
+    },
+    {
+      "id": "a.season_matched",
+      "type": "axis",
+      "t": "test 가 1~6월뿐이므로 학습 행을 같은 계절로 제한해 covariate shift 를 줄인다",
+      "src": "P1/experiments/log.md",
+      "status": "closed",
+      "evidence": "exp013 public F1 0.582477 (11.455269점). exp010 0.741274 대비 -0.158797. 양성률 2.9874% 로 통제된 비교. train 행 55% 삭제가 계절 정합 이득을 압도"
+    },
+    {
+      "id": "r.duration_prior",
+      "type": "rule",
+      "t": "문제지 명시 주입 규격: spike 10분(1행), noise 3~58.8h(18~353행), flatline 2~47.2h(12~283행), offset 8~86.5h(48~519행), drift 9~86.5h(54~519행). train 라벨 run 263개 실측 — 길이 2~11 run 이 정확히 0개(길이1 101개, 12+ 162개). 예측에 2~11 run 이 있으면 FP 이거나 파편이다. 길이1 은 spike 이므로 절대 삭제 금지(T14 L=12 가 spike recall 0.686->0.059 로 붕괴시켰다)",
+      "src": "문제지 1-3"
+    },
+    {
+      "id": "f.problem_statement_2026",
+      "type": "fact",
+      "t": "문제지 추가 사실: 이상은 원자료 품질플래그 good_data 구간에만 주입, 유효 관측의 약 4%. 층간 상관은 조석혼합기엔 유효하나 수온약층 발달기엔 소실되어 정상 성층을 오탐할 위험(test 1~6월 = 겨울 혼합->봄 성층 전이). 정점·층 단위 표준화 지표가 전 구간 공통 임계보다 안정적이라고 명시. 데이터 특이: P2 보호로 S-ORS 2025년 9~10월 layer 2·3·4 제외, G-ORS 2026 depth 전부 결측(test depth 결측률 9.68%), I-ORS 2026 layer3 미운영. 규칙 베이스라인 전체 F1 0.548255. 종합점수는 각 리더보드 분할에서 같은 베이스라인을 재채점한 값을 사용 = 분할이 여러 개다",
+      "src": "문제지 1-2~1-6, 주최측 사전검증"
+    },
+    {
+      "id": "a.runlength_prior",
+      "type": "axis",
+      "t": "주입 지속시간 사전 기반 후처리: 2~11행 run 제거 또는 12행 중앙 확장",
+      "src": "P1/specs/T25-runlength-prior.md",
+      "status": "open"
+    },
+    {
+      "id": "f.t25_runlength_measure",
+      "type": "fact",
+      "t": "inner M1 short-run precision 0.205357; M2 expansion added 128 rows with TP precision 0.023438 and F1 0.694835; test short runs 9",
+      "src": "P1/src/t25_runlength.py"
+    },
+    {
+      "id": "s.exp017",
+      "type": "asset",
+      "t": "P1/subs/exp017.csv + P1/preds/test_exp017.npy + P1/cache/exp017_meta.json",
+      "src": "P1/src/t25_runlength.py"
+    },
+    {
+      "id": "s.exp018",
+      "type": "asset",
+      "t": "P1/subs/exp018.csv + P1/preds/test_exp018.npy + P1/cache/exp018_meta.json",
+      "src": "P1/src/t25_runlength.py"
+    },
+    {
+      "id": "g.t25_sub",
+      "type": "gate",
+      "t": "T25 제출물은 audit와 check.py sub를 모두 통과하고 길이 1 run 개수가 보존되어야 한다",
+      "src": "P1/AGENTS.md; P1/specs/T25-runlength-prior.md"
+    },
+    {
+      "id": "f.neighbor_wins",
+      "type": "fact",
+      "t": "이웃 회귀 잔차 4개(n1 n2_432 n3 n4) 추가 exp016 public F1 0.776056 (27.381306점). exp010 0.741274 대비 +0.034782 = P1 최대 단일 이득. 양성률 2.9998% 로 통제. 시사: 행 단위 AUC 측정(Q2/Q3 방식)은 public 으로 전이되지만 inner F1 은 전이되지 않는다. 다음 feature 후보도 AUC 로 사전 선별하라",
+      "src": "P1/experiments/log.md"
+    },
+    {
+      "id": "f.judge_scope",
+      "type": "fact",
+      "t": "연도 홀드아웃 판정기 J (학습 2024년 279,185행 purge 87h, 검증 2025-01~06, 확률 예측·AUC). 검증 결과: auc_all 로 neighbor46 0.932374 > season42 0.923480 > base42 0.915129 > invariant37 0.906768 > integrated47 0.897338. public 은 neighbor46 0.776056 > base42 0.741274 > integrated47 0.717975 > season42 0.582477. **feature 집합 비교 3개(neighbor46>base42>integrated47)는 순서가 정확히 일치**하나 학습 행 부분집합 변형(season42)은 크게 틀린다(판정기 2위, public 최하). judge_F1 은 Spearman -0.8 로 여전히 역상관. 사용 규칙: **같은 학습 행에서 feature 집합·하이퍼파라미터만 바꾼 비교에 auc_all 만 쓴다.** 학습 행 변경 비교에는 쓰지 마라",
+      "src": "P1/experiments/logs/t27_out3.log"
+    },
+    {
+      "id": "f.judge_proba_bug",
+      "type": "fact",
+      "t": "T26 판정기 1차 결과 전량 폐기. LGBMClassifier.predict() 가 확률이 아니라 0/1 라벨을 반환해 val raw 고유값이 2개였다. 증상: t_high 전부 1.000, 상위 동점 203,088/208,093행, AUC 0.70대, Spearman 0.200. 수정 후 AUC 0.90~0.93, 동점 1. 저장 전 고유값 1000 미만이면 예외를 던지는 가드를 t26/t27 양쪽에 넣었다",
+      "src": "P1/specs/T29-judge-proba-bug.md"
+    },
+    {
+      "id": "f.hyperparams_optimal",
+      "type": "fact",
+      "t": "판정기로 하이퍼파라미터 3종 검정, 슬롯 0 소모. auc_all: neighbor46 기준 0.932374 대비 hp_leaves127(leaves 127/min_child 40) 0.929112, hp_trees1400(1400tree/lr0.025) 0.927216, hp_posweight1(scale_pos_weight 1.0) 0.923437 — 전부 하락. 기존 설정(700 tree, lr 0.05, num_leaves 63, min_child_samples 80, scale_pos_weight 2.0)이 이 축에서 최적 근방이다",
+      "src": "P1/experiments/logs/t27_out4.log"
+    },
+    {
+      "id": "a.hyperparams",
+      "type": "axis",
+      "t": "LightGBM 하이퍼파라미터 탐색",
+      "src": "P1/experiments/logs/t27_out4.log",
+      "status": "closed",
+      "evidence": "판정기 auc_all 로 단일변수 3종 전부 하락 (0.9291/0.9272/0.9234 vs 기준 0.9324). 슬롯 미사용"
+    },
+    {
+      "id": "f.standardized49_wins",
+      "type": "fact",
+      "t": "판정기 auc_all 순위: standardized49 0.936068 > neighbor46 0.932374 > hp_leaves127 0.929112 > hp_trees1400 0.927216 > season42 0.923480 > hp_posweight1 0.923437 > base42 0.915129 > invariant37 0.906768 > integrated47 0.897338. standardized49(=46 + s1,s2,s8_432)가 유일하게 현재 최고를 이긴다. drift AUC 0.913054 vs 0.899629. 제출 후보 exp019 (양성 5063, 2.9957%, t_high 0.785, sha 221011B2E2)",
+      "src": "P1/experiments/logs/t27_out4.log"
+    },
+    {
+      "id": "f.gors_neighbor_gap",
+      "type": "fact",
+      "t": "G-ORS 는 층이 1개라 이웃 회귀 잔차 계열(n1 s1 s2 s8_432)이 전부 NaN 이다. test 169,011행 중 16,331행(9.7%)이 이웃 신호 없이 판정된다. 대안은 기지간(같은 층 번호 다른 기지) 회귀 잔차 — Q3-B 에서 중앙값 기반 y4 의 S-ORS offset AUC 0.896873, I-ORS 0.801531. G-ORS 층 1 은 I-ORS·S-ORS 층 1 로 덮인다",
+      "src": "P1/experiments/logs/exp019_train.log"
     }
   ],
   "edges": [
@@ -421,6 +556,26 @@
       "f.exp006_fn_decomp",
       "derives_from",
       "f.exp005_result"
+    ],
+    [
+      "a.runlength_prior",
+      "derives_from",
+      "f.problem_statement_2026"
+    ],
+    [
+      "f.t25_runlength_measure",
+      "derives_from",
+      "a.runlength_prior"
+    ],
+    [
+      "g.t25_sub",
+      "measures",
+      "s.exp017"
+    ],
+    [
+      "g.t25_sub",
+      "measures",
+      "s.exp018"
     ]
   ]
 }

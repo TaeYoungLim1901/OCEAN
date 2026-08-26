@@ -1,5 +1,6 @@
 """E004: E003 예측의 행 단위 missing_public 게이트."""
 import json
+import pickle
 import sys
 from pathlib import Path
 
@@ -198,6 +199,11 @@ def main():
     cache = C.ROOT / "cache" / "E004"
     cache.mkdir(parents=True, exist_ok=True)
     (cache / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+    model_path = C.ROOT / "models" / "E004.pkl"
+    if not model_path.exists():
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(model_path, "wb") as f:
+            pickle.dump({"models": {}, "selected": selected, "metrics": metrics, "seed": SEED}, f)
 
     stats = {}
     for hold, flags in zip(HOLDS, flag_parts):

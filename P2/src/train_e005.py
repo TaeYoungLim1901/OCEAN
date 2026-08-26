@@ -1,5 +1,6 @@
 """E005: 공개층 결측 패턴을 주입한 E002 fixed-depth 모델."""
 import json
+import pickle
 import sys
 import time
 from pathlib import Path
@@ -187,6 +188,7 @@ def main():
     runtime = {"limit_seconds": LIMIT_SECONDS, "holds": {}, "total_seconds": None}
     started = time.perf_counter()
     oof_parts = {candidate: [] for candidate in ("maskaug", "missing_only")}
+    final_models = {}
     all_completed = True
     offset = 0
 
@@ -248,9 +250,16 @@ def main():
             raise ValueError("E004 test 예측 길이 불일치")
         for candidate in ("maskaug", "missing_only"):
             x_fit, rows_fit = _fit_input(x_clean, x_aug, all_rows, candidate, augmented_rows)
-            raw = predict(fit_models(x_fit, rows_fit), x_test, test_rows)
+            models = fit_models(x_fit, rows_fit)
+            final_models[candidate] = models
+            raw = predict(models, x_test, test_rows)
             gated = np.where(test_flags, np.clip(raw, -5, 45), baseline_test)
             save_pool_pred(C.ROOT / "preds" / f"test_{candidate}_E005.npy", gated)
+        model_path = C.ROOT / "models" / "E005.pkl"
+        if not model_path.exists():
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(model_path, "wb") as f:
+                pickle.dump({"models": final_models, "features": FEATURES, "seed": C.SEED}, f)
 
     runtime["total_seconds"] = time.perf_counter() - started
     runtime["completed_all"] = all_completed

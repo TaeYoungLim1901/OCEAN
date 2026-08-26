@@ -1,4 +1,5 @@
 """E013: Sep-Oct aligned OOF judgment and leave-one-window-out stacking."""
+import argparse
 import re
 import subprocess
 import sys
@@ -36,14 +37,21 @@ def _window_data(obs):
 
 
 def _logical_name(stem):
-    return re.sub(r"_S[1-4]_E006$", "", stem)
+    return re.sub(r"_(?:S[1-4]|2024_sepoct)_E\d+$", "", stem)
+
+
+def _experiment_number(stem):
+    match = re.search(r"_E(\d+)$", stem)
+    return int(match.group(1)) if match else -1
 
 
 def _candidate_pool(data, obs):
     candidates = {}
+    sources = {}
     for path in sorted((ROOT / "preds").glob("oof_*.npy")):
         name = _logical_name(path.stem[4:])
         candidates.setdefault(name, {})
+        sources.setdefault(name, {})
         try:
             pred = np.load(path, allow_pickle=False)
             if pred.ndim != 1 or not np.isfinite(pred).all():
@@ -52,9 +60,11 @@ def _candidate_pool(data, obs):
                 if len(pred) != len(data[label]["rows"]):
                     continue
                 current = candidates[name].get(label)
-                preferred = f"oof_{name}_{label}_E006.npy"
-                if current is None or path.name == preferred:
+                current_source = sources[name].get(label)
+                if (current is None or
+                        _experiment_number(path.stem) > _experiment_number(current_source)):
                     candidates[name][label] = pred.astype(float, copy=False)
+                    sources[name][label] = path.stem
         except Exception:
             continue
 
@@ -65,7 +75,29 @@ def _candidate_pool(data, obs):
     }
     full = {name: values for name, values in candidates.items()
             if all(label in values for label in WINDOWS)}
-    return full, sorted(set(candidates) - set(full)), test_rows, test_x
+    experiments = {
+        name: max(_experiment_number(stem) for stem in sources[name].values())
+        for name in full if sources.get(name)
+    }
+    return full, sorted(set(candidates) - set(full)), test_rows, test_x, experiments
+
+
+def _test_paths(pool, experiments):
+    paths = {}
+    excluded = []
+    for name in sorted(pool):
+        if name == "base_nom":
+            continue
+        if name == "maskaug":
+            path = ROOT / "preds" / "test_maskaug_E005.npy"
+        else:
+            number = experiments.get(name, -1)
+            path = ROOT / "preds" / f"test_{name}_E{number:03d}.npy"
+        if path.exists():
+            paths[name] = path
+        else:
+            excluded.append(name)
+    return paths, excluded
 
 
 def _candidate_report(data, pool):
@@ -120,7 +152,7 @@ def _lowo_report(data, pool):
     return reports, means
 
 
-def _fit_all(data, pool, mode, test_rows, test_x):
+def _fit_all(data, pool, mode, test_rows, test_x, test_paths):
     names = sorted(pool)
     x_oof = np.vstack([np.column_stack([pool[name][label] for name in names])
                        for label in WINDOWS])
@@ -129,10 +161,8 @@ def _fit_all(data, pool, mode, test_rows, test_x):
     for name in names:
         if name == "base_nom":
             x_test.append(test_x.base_nom.to_numpy(float))
-        elif name == "maskaug":
-            x_test.append(np.load(ROOT / "preds" / "test_maskaug_E005.npy", allow_pickle=False))
         else:
-            x_test.append(np.load(ROOT / "preds" / f"test_{name}.npy", allow_pickle=False))
+            x_test.append(np.load(test_paths[name], allow_pickle=False))
     x_test = np.column_stack(x_test)
     if mode == "stack_global":
         weights = _fit_simplex(x_oof, y)
@@ -164,15 +194,21 @@ def _fit_all(data, pool, mode, test_rows, test_x):
 
 
 def _write_submission(test_pred):
-    out = ROOT / "subs" / "E013_stack_sepoct.csv"
-    with tempfile.TemporaryDirectory(prefix="e013_mix_") as temp:
+    out = ROOT / "subs" / "E022_stack_sepoct.csv"
+    out_npy = ROOT / "preds" / "test_stack_sepoct_E022.npy"
+    if out.exists():
+        raise FileExistsError(f"출력 파일이 이미 존재합니다: {out}")
+    if out_npy.exists():
+        raise FileExistsError(f"출력 파일이 이미 존재합니다: {out_npy}")
+    with tempfile.TemporaryDirectory(prefix="e022_mix_") as temp:
         missing = Path(temp) / "missing.npy"
         complete = Path(temp) / "complete.npy"
         save_pool_pred(missing, test_pred)
         save_pool_pred(complete, test_pred)
         result = subprocess.run(
             [sys.executable, str(ROOT / "src" / "mix_sub.py"),
-             "--missing", str(missing), "--complete", str(complete), "--out", str(out)],
+             "--missing", str(missing), "--complete", str(complete), "--out", str(out),
+             "--out-npy", str(out_npy)],
             cwd=ROOT.parent, capture_output=True, text=True, encoding="utf-8"
         )
     if result.returncode:
@@ -185,14 +221,15 @@ def _write_submission(test_pred):
     print(result.stdout.strip())
 
 
-def main():
+def main(write_artifacts=False):
     obs = C.load_obs()
     data = _window_data(obs)
     missing_windows = [label for label in WINDOWS if label not in data]
     if missing_windows:
         print("skipped | " + ",".join(missing_windows))
         return 0
-    pool, skipped, test_rows, test_x = _candidate_pool(data, obs)
+    pool, skipped, test_rows, test_x, experiments = _candidate_pool(data, obs)
+    test_paths, excluded = _test_paths(pool, experiments)
     rows, _ = _candidate_report(data, pool)
     print("표1 | 후보 | 2024_sepoct_전체 | 2024_sepoct_결측 | 2024_sepoct_완전 | S1 | S3 | S4 | sepoct_mean")
     for row in rows[:10]:
@@ -202,6 +239,7 @@ def main():
             f"{row['sepoct_mean']:.6f}",
         ]))
     print("skipped | " + (",".join(skipped) if skipped else "0"))
+    print("excluded | " + (",".join(excluded) if excluded else "0"))
 
     if "maskaug" not in pool:
         print("표2 | maskaug | NA")
@@ -221,13 +259,17 @@ def main():
         print("G | 해당없음")
         return 0
     selected = min(winners, key=lambda name: means[name])
-    oof_pred, test_pred = _fit_all(data, pool, selected, test_rows, test_x)
-    save_pool_pred(ROOT / "preds" / "oof_stack_sepoct_E013.npy", oof_pred)
-    save_pool_pred(ROOT / "preds" / "test_stack_sepoct_E013.npy", test_pred)
+    if not write_artifacts:
+        return 0
+    stack_pool = {name: values for name, values in pool.items() if name not in excluded}
+    oof_pred, test_pred = _fit_all(data, stack_pool, selected, test_rows, test_x, test_paths)
+    save_pool_pred(ROOT / "preds" / "oof_stack_sepoct_E022.npy", oof_pred)
     print(f"artifacts | 1 | {selected}")
     _write_submission(test_pred)
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--write-artifacts", action="store_true")
+    raise SystemExit(main(parser.parse_args().write_artifacts))

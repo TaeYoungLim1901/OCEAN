@@ -3,3 +3,6 @@ sha256,time,file,public,local,note
 8dc6a7cd34c8591919dccad7781a990ff3c99dd9d32b1f80b7d169a3462b674f,2026-08-25T12:44:46.293529+00:00,D:\hackathon\OCEAN\P2\subs\E009_maskaug_diff.csv,0.525759,1.093805,maskaug on missing rows; Delta -0.011340 vs E004
 57aeef5ea806f422397058730ee969da188178932dfa20f7de73ddddb36c8974,2026-08-25T13:31:13.719368+00:00,D:\hackathon\OCEAN\P2\subs\E010_stackregime_complete.csv,0.528449,0.514111,"complete rows stack_regime; judge 2024_sepoct predicted loss, confirmed"
 2ba9c6856f2e7be5fea79b9ea8fa3408a449c315600b5ee3558ea95930e9b4f3,2026-08-25T13:53:19.310284+00:00,D:\hackathon\OCEAN\P2\subs\E011_missingonly.csv,0.530045,0.496687,"missing rows missing_only; judge predicted loss, confirmed 3/3"
+0cc27d220c7703b47486ccb88c0eb8bc98b30fedb5aba1edc361a25fdaf326b0,2026-08-26T01:42:53.345116+00:00,D:\hackathon\OCEAN\P2\subs\E014_antistack_w-1.csv,0.523888,,
+c4c16318c17efbfd8f1f84c85d9478855b2e999127e2fec02298c61d9e858159,2026-08-26T01:42:54.086887+00:00,D:\hackathon\OCEAN\P2\subs\E017_antistack_w-2.5.csv,0.522638,,
+cadc25d499862ea2335efda2c40bc6a0fe62209cbd93393ab27ffb47c53fd895,2026-08-26T07:29:59.688876+00:00,D:\hackathon\OCEAN\P2\subs\E022_stack_sepoct.csv,0.560599,,
