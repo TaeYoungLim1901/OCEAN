@@ -57,7 +57,11 @@ usersite="$(python -c 'import site;print(site.getusersitepackages())' 2>/dev/nul
 # shell_environment_policy 로 직접 주입한다 (2026-08-13 T6·T8 2회 실패).
 # 값은 TOML 로 파싱된다. Windows 경로의 백슬래시가 basic string 에서는 잘못된 이스케이프(\U)라
 # 통째로 무시된다. TOML literal string(작은따옴표)을 써야 한다.
+# PYTHONPATH 주입은 간헐적으로 샌다 (2026-08-26 T26 전멸 / T27 6회 실패 후 회피).
+# 진짜 원인은 APPDATA 부재다 — python 은 user site 경로를 %APPDATA% 에서 계산하므로
+# APPDATA 만 넘겨주면 PYTHONPATH 없이도 스스로 sys.path 에 넣는다. 둘 다 준다.
 env_inject=(-c "shell_environment_policy.set.OCEAN_CX='1'")
+[ -n "$APPDATA" ] && env_inject=(-c "shell_environment_policy.set.APPDATA='$(cygpath -w "$APPDATA")'" "${env_inject[@]}")
 [ -n "$usersite" ] && env_inject=(-c "shell_environment_policy.set.PYTHONPATH='${usersite}'" "${env_inject[@]}")
 
 {

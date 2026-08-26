@@ -110,7 +110,10 @@ def c4():
     mapping = {"submission_p3_t1f": "test_final_p3_t1f.npy", "submission_p3_t1f_r2": "test_final_p3_t1f_r2.npy",
                "submission_p3_t1f_bias": "test_final_p3_t1f_bias.npy", "submission_p3_t1f_shift": "test_final_p3_t1f_shift.npy",
                "submission_p3_t1": "test_final_p3_t1.npy", "submission_p3_lgbm_only": "test_lgbm_p3_t1.npy",
-               "submission_p3_damped_only": "test_damped_p3_t1.npy"}
+               "submission_p3_damped_only": "test_damped_p3_t1.npy",
+               "submission_p3_blend_t21": "test_blend_t21_p3_t27.npy",
+               "submission_p3_lr": "test_lr_p3_t26.npy", "submission_p3_ls": "test_ls_p3_t26.npy",
+               "submission_p3_alpha05": "test_alpha05_p3_t31.npy"}
     pred_mismatch = unmapped = 0
     for p in sorted(SUBS.glob("*.csv")):
         s = pd.read_csv(p)

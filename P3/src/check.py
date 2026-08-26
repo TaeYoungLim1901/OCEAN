@@ -160,7 +160,9 @@ def c_hashes():
 
 def c_final(csv_path):
     csv_path = pathlib.Path(csv_path).resolve()
-    runner = {"submission_p3_t1f": ("inference_t1f.py", "test_final_p3_t1f.npy")}.get(csv_path.stem)
+    runner = {"submission_p3_t1f": ("inference_t1f.py", "test_final_p3_t1f.npy"),
+              "submission_p3_t1f_bias": ("inference_t1f_bias.py", "test_final_p3_t1f_bias.npy"),
+              "submission_p3_lr": ("inference_lr.py", "test_lr_p3_t26.npy")}.get(csv_path.stem)
     try:
         if runner is None:
             raise ValueError(f"unsupported submission runner: {csv_path.stem}")
@@ -169,23 +171,34 @@ def c_final(csv_path):
         code_names = ["cases.py", "features.py", "metric.py", "submission_tools.py",
                       "train.py", runner[0]]
         weight = C.P3 / "models" / "p3_t1" / "bundle.pkl"
-        if not weight.is_file():
+        if csv_path.stem != "submission_p3_lr" and not weight.is_file():
             raise FileNotFoundError(weight)
         with tempfile.TemporaryDirectory(prefix="p3_final_") as td:
             isolated = pathlib.Path(td) / "P3"
             for part in ("src", "models/p3_t1", "P3_data", "preds", "subs"):
                 (isolated / part).mkdir(parents=True, exist_ok=True)
+            if csv_path.stem == "submission_p3_lr":
+                code_names += ["features_t2.py", "train_t2.py", "train_dense.py",
+                               "tune_lgbm_dense.py", "train_target_transform.py"]
+                (isolated / "cache" / "p3_t8").mkdir(parents=True, exist_ok=True)
+                for rel in ("cache/cases.parquet", "cache/grid_G-ORS.parquet",
+                            "cache/grid_I-ORS.parquet", "cache/grid_S-ORS.parquet",
+                            "cache/p3_t2/folds.csv", "cache/p3_t9/dense_weights.csv"):
+                    target = isolated / rel
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(C.P3 / rel, target)
             for name in code_names:
                 shutil.copy2(C.P3 / "src" / name, isolated / "src" / name)
             for name in ("test_context.parquet", "test_index.csv"):
                 shutil.copy2(C.DATA / name, isolated / "P3_data" / name)
-            shutil.copy2(weight, isolated / "models" / "p3_t1" / "bundle.pkl")
+            if weight.is_file():
+                shutil.copy2(weight, isolated / "models" / "p3_t1" / "bundle.pkl")
             proc = subprocess.run([sys.executable, str(isolated / "src" / runner[0])],
                                   cwd=isolated, capture_output=True, text=True,
                                   encoding="utf-8", errors="replace")
             if proc.returncode:
                 raise RuntimeError((proc.stdout + proc.stderr).strip())
-            if (isolated / "cache").exists():
+            if csv_path.stem != "submission_p3_lr" and (isolated / "cache").exists():
                 raise RuntimeError("isolated inference read or created cache")
             generated_csv = isolated / "subs" / csv_path.name
             generated_pred = isolated / "preds" / runner[1]
@@ -203,7 +216,8 @@ def c_final(csv_path):
                     "pred_npy": f"P3/preds/{runner[1]}",
                     "pred_sha256": file_sha256(C.P3 / "preds" / runner[1]),
                     "code_files": code_files,
-                    "weights": {"P3/models/p3_t1/bundle.pkl": file_sha256(weight)},
+                    "weights": ({"P3/models/p3_t1/bundle.pkl": file_sha256(weight)}
+                                if weight.is_file() else {}),
                     "seed": 42, "created": datetime.now(timezone.utc).isoformat()}
         manifest_path = csv_path.with_suffix(".manifest.json")
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

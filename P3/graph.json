@@ -685,6 +685,74 @@
       "type": "gate",
       "t": "R5 저장 dtype 보존·CSV CRLF·final 재현 통과: CSV 2E4984283B, NPY float64 (200,6), preflight READY",
       "src": "P1/specs/R5-repro-dtype.md"
+    },
+    {
+      "id": "f.public_mse_algebra_exact",
+      "type": "fact",
+      "t": "제출 1회 = public 잔차의 선형범함수 1개라는 항등식이 실측으로 정확히 성립한다. T1F+상수 c*=-0.041550308 의 예측 public RMSE 0.585693 이 실측과 재구성 오차 0.000000 (임계 2e-6). 따라서 u 지시함수 탐침으로 mean(u*e) 를 잡음 없이 얻을 수 있다",
+      "src": "p3_t22 rule(3), 2026-08-26 LB"
+    },
+    {
+      "id": "f.t25_structured_bias",
+      "type": "fact",
+      "t": "T25 folds1-3 fit: G -0.018357042 / L [-0.026478909,-0.029113957,-0.022521529,-0.011091556,-0.015903769,-0.005032531] / S [-0.076261907,-0.033083652,+0.049739140] / SL 18; fold4 RMSE G 0.609233 / L 0.609637 / S 0.613654 / SL 0.617257; baseline 0.611959244 delta +0.000000244; G expected -0.035651675 delta +0.017294633; clips 0/0/0/0; T25_STOP",
+      "src": "P3/src/run_t21.py --folds 4; T25-structured-bias.md; 2026-08-26"
+    },
+    {
+      "id": "a.structured_bias_correction",
+      "type": "axis",
+      "t": "T1F 잔차 상수보정을 전역 1개가 아니라 리드별(6)·정점별(3)·정점x리드(18) 로 세분해 적합",
+      "src": "p3_t25",
+      "status": "closed",
+      "evidence": "folds1-3 적합 후 봉인 fold4: G 0.609233 / L 0.609637 (+0.000404) / S 0.613654 (+0.004420) / SL 0.617257 (+0.008024). 사전등록 임계는 G 대비 0.003 이상 개선인데 전부 오히려 악화. 적합상수가 폴드를 못 넘는다 — S-ORS folds1-3 +0.049739 vs fold4 -0.142157 로 부호 반전. 채점경로 대조군 none fold4 0.611959244 (델타 2.4e-7) 통과"
+    },
+    {
+      "id": "f.bias_structure_nontransferable",
+      "type": "fact",
+      "t": "편향의 전역 평균만 폴드·표본을 넘어 전이된다. 정점·리드 세분 상수는 적합 폴드 밖에서 부호가 뒤집힌다(S-ORS +0.0497 -> -0.1422). 따라서 public 리드별·정점별 지시함수 탐침은 제출 예산 낭비다",
+      "src": "p3_t25 표 B-1·B-2"
+    },
+    {
+      "id": "f.nontree_probe_t27",
+      "type": "fact",
+      "t": "T27 fixed blend package: weights 0.00/0.05/0.25/0.15/0.55; audit=OK; preflight=OK; bugcheck=OK; blend_mean=1.662391; clip_rows=0; pred_max_delta=4.44e-16; submission_sha256=77C4F71C19FBCD8357C3389D2C91DB94A7EDBDA430FB664362BC9B0CADA43BAB",
+      "src": "P3/specs/T27-nontree-probe-sub.md"
+    },
+    {
+      "id": "f.t26_fold1_smoke",
+      "type": "fact",
+      "t": "T26 fold1 smoke: control 0.757150; R 0.753991 s=1.000000000 clips=0; LR 0.685529 s=1.008208986 clips=0; LS 0.739108 s=1.003016557 clips=0",
+      "src": "P3/specs/T26-target-transform.md; 2026-08-26 smoke"
+    },
+    {
+      "id": "f.log_ratio_target_wins",
+      "type": "fact",
+      "t": "로그비율 타깃 log(y/(hs0+0.1)) + 폴드내 smearing 이 봉인 fold4 조밀 재가중에서 T1F 0.611959 를 0.598926 으로 이긴다 (-0.013033). log1p 타깃도 0.603982 (-0.007977). 하이퍼파라미터·피처·폴드 동일, 타깃만 변경. 단 lgbm_t1 잔차상관 0.96~0.98 로 다양성은 없고 fold2·fold3 에서는 진다",
+      "src": "p3_t26/p3_t28"
+    },
+    {
+      "id": "f.public_split_66_cases",
+      "type": "fact",
+      "t": "문제지 공지: P3 public 분할은 200사례 중 66사례(396건)다. Private 순위는 달라질 수 있으며 public 만을 모델 선택의 유일한 근거로 삼지 말라고 명시됐다. T19 의 무작위 부분집합 추정 k_ok=[20,40,60,80] 과 일치하며 식별 문제는 이것으로 종결",
+      "src": "문제지 3-6 공지, 2026-08-26 수령"
+    },
+    {
+      "id": "f.lb_delta_noise_floor",
+      "type": "fact",
+      "t": "public 이 66사례뿐이므로 LB RMSE 델타 0.003~0.007 급은 표본잡음과 구별되지 않는다. ledger 상위 5점(0.585693~0.592805)의 순서는 근거가 약하다. 신뢰 가능한 것은 damped 0.642689 처럼 0.05 급으로 벌어진 비교뿐이며 f.lb_picks_dense_judge 는 그 급이라 유효하다. 상수 편향보정은 예외 — 두 점 비교가 아니라 항등식 실측이고 로컬 5,963행이 독립 확인했다",
+      "src": "문제지 3-6 + T19 부트스트랩 sd"
+    },
+    {
+      "id": "f.line_search_closed_form",
+      "type": "fact",
+      "t": "두 예측 사이 직선 위 최적 가중은 제출 3회로 정확히 풀린다 (M0,M1,M0.5 -> A,B -> alpha*=-A/B). T1F-lr 직선에서 alpha*=0.465947, public 0.585693 -> 0.577650 (-0.008043). 5멤버 격자탐색은 3연패했으나 1파라미터 폐형 최적화는 성공했다 — 자유도가 문제였다",
+      "src": "p3_t31"
+    },
+    {
+      "id": "f.alpha_local_fold_flip",
+      "type": "fact",
+      "t": "T1F-lr 직선의 로컬 최적 alpha 는 폴드마다 부호가 뒤집힌다 (f1 +0.211 / f2 -0.423 / f3 -0.233 / f4 +0.779, 통합 -0.036). 통합 판정기는 폴드 상쇄로 0 을 만들어 무정보다. test 가 fold4 이후이므로 fold4 가 유일하게 train->test 를 복제한다. fold4 +0.779 와 public +0.466 은 같은 방향",
+      "src": "p3_t32"
     }
   ],
   "edges": [
@@ -887,6 +955,11 @@
       "f.t23_control_bias",
       "derives_from",
       "f.t9_weighted_dense"
+    ],
+    [
+      "f.t26_fold1_smoke",
+      "derives_from",
+      "f.lb_picks_dense_judge"
     ]
   ]
 }

@@ -20,6 +20,7 @@ T8 = P3 / "cache" / "p3_t8"
 T9 = P3 / "cache" / "p3_t9"
 MEMBERS = ("arx", "wsswell")
 SIMPLEX_UNITS = 20
+T25_BASELINE = 0.611959
 
 
 def load_dense():
@@ -137,6 +138,99 @@ def load_t21_outputs(n, test_n):
         oof[name] = oof_pred.astype(float)
         test[name] = test_pred.astype(float)
     return oof, test
+
+
+def fit_bias(error, mask, weights, stations, variant):
+    selected_error = error[mask]
+    selected_weights = weights[mask]
+    if variant == "g":
+        return float(np.sum(selected_weights[:, None] * selected_error) /
+                     (selected_weights.sum() * selected_error.shape[1]))
+    if variant == "l":
+        return np.array([np.sum(selected_weights * selected_error[:, j]) /
+                         selected_weights.sum() for j in range(N_LEADS)])
+    values = []
+    for station in C.STATIONS:
+        station_mask = mask & (stations == station)
+        station_error = error[station_mask]
+        station_weights = weights[station_mask]
+        if not station_weights.size:
+            values.append(np.nan if variant == "s" else [np.nan] * N_LEADS)
+            continue
+        if variant == "s":
+            values.append(np.sum(station_weights[:, None] * station_error) /
+                          (station_weights.sum() * N_LEADS))
+        else:
+            values.append([np.sum(station_weights * station_error[:, j]) /
+                           station_weights.sum() for j in range(N_LEADS)])
+    return np.asarray(values)
+
+
+def structured_bias(dense, y, t1f, fold, weights):
+    fold4 = fold == 4
+    fit_mask = np.isin(fold, [1, 2, 3])
+    stations = dense.station.to_numpy()
+    baseline = weighted_rmse(y[fold4], t1f[fold4], weights[fold4])
+    print(f"T25_CONTROL none df=0 fold4_rmse={baseline:.6f} delta={baseline - T25_BASELINE:+.6f}")
+    if abs(baseline - T25_BASELINE) > 5e-7:
+        print(f"T25_STOP baseline={baseline:.9f} expected={T25_BASELINE:.9f} delta={baseline - T25_BASELINE:+.9f}")
+        raise SystemExit(1)
+
+    rows = []
+    fitted = {}
+    for name, df in (("G", 1), ("L", N_LEADS), ("S", len(C.STATIONS)),
+                     ("SL", len(C.STATIONS) * N_LEADS)):
+        variant = name.lower()
+        c = fit_bias(y - t1f, fit_mask, weights, stations, variant)
+        fitted[variant] = c
+        shift = np.asarray(c)
+        if variant == "g":
+            corrected = t1f + shift
+        elif variant == "l":
+            corrected = t1f + shift[None, :]
+        else:
+            station_shift = shift if variant == "s" else shift.mean(axis=1)
+            corrected = t1f + station_shift[np.searchsorted(C.STATIONS, stations), None]
+            if variant == "sl":
+                corrected = t1f + shift[np.searchsorted(C.STATIONS, stations)]
+        clipped = np.clip(corrected, 0, 30)
+        np.save(PREDS / f"oof_dense_t1f_corr_{variant}_p3_t25.npy", clipped)
+        rows.append((name, df, weighted_rmse(y[fold4], clipped[fold4], weights[fold4]),
+                     int(np.count_nonzero(clipped != corrected))))
+
+    g_rmse = rows[0][2]
+    print("변형 | 자유도 | fold4 RMSE | vs 0.611959 델타 | vs G 델타 | 클립행수")
+    for name, df, score, clipped_n in rows:
+        print(f"{name} | {df} | {score:.6f} | {score - T25_BASELINE:+.6f} | {score - g_rmse:+.6f} | {clipped_n}")
+
+    print("단위 | folds1-3 적합 c | fold4 적합 c | 차이")
+    for station in C.STATIONS:
+        fit = fitted["s"][C.STATIONS.index(station)]
+        test_mask = fold4 & (stations == station)
+        test = fit_bias(y - t1f, test_mask, weights, stations, "s")[C.STATIONS.index(station)]
+        print(f"S:{station} | {fit:+.9f} | {test:+.9f} | {test - fit:+.9f}")
+    for j, lead in enumerate(C.LEADS):
+        fit = fitted["l"][j]
+        test_mask = fold4
+        test = fit_bias(y - t1f, test_mask, weights, stations, "l")[j]
+        print(f"L:{lead} | {fit:+.9f} | {test:+.9f} | {test - fit:+.9f}")
+    sl_fit = fitted["sl"]
+    sl_test = fit_bias(y - t1f, fold4, weights, stations, "sl")
+    diffs = []
+    for i, station in enumerate(C.STATIONS):
+        for j, lead in enumerate(C.LEADS):
+            diffs.append((abs(sl_test[i, j] - sl_fit[i, j]), station, lead,
+                          sl_fit[i, j], sl_test[i, j]))
+    for _, station, lead, fit, test in sorted(diffs, reverse=True)[:5]:
+        print(f"SL:{station} x {lead} | {fit:+.9f} | {test:+.9f} | {test - fit:+.9f}")
+
+    print("대조군 | 값 | 기대값 | 델타")
+    for label, value, expected in (("none_fold4_rmse", baseline, T25_BASELINE),
+                                   ("G_fit_c", fitted["g"], -0.035651675)):
+        print(f"{label} | {value:+.9f} | {expected:+.9f} | {value - expected:+.9f}")
+    if abs(fitted["g"] + 0.035651675) > 0.002:
+        print(f"T25_STOP G_fit_c={fitted['g']:+.9f} expected=-0.035651675 delta={fitted['g'] + 0.035651675:+.9f}")
+        raise SystemExit(1)
 
 
 def main(argv=None):
@@ -283,6 +377,8 @@ def main(argv=None):
     sd = bootstrap_bias(t1f_error, dense_weights)
     z = (0.041550308 - bias_weighted) / sd
     print(f"BIASSE sd={sd:.9f} z_vs_public={z:+.6f}")
+    if args.folds == 4:
+        structured_bias(dense, y, control_pred["t1f"], fold, dense_weights)
 
 
 if __name__ == "__main__":
